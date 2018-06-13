@@ -5,25 +5,16 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/smtp"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/spf13/viper"
+	"gopkg.in/telegram-bot-api.v4"
 )
 
 // Whether we are in development mode or not
 var dev *bool
-
-// Whether we want an email to be sent when the script ends / crashes
-var nomail *bool
-
-// Whether we want to launch the unfollow mode
-var unfollow *bool
-
-// Acut
-var run *bool
 
 // An image will be liked if the poster has more followers than likeLowerLimit, and less than likeUpperLimit
 var likeLowerLimit int
@@ -73,9 +64,6 @@ func check(err error) {
 
 // Parses the options given to the script
 func parseOptions() {
-	run = flag.Bool("run", false, "Use this option to follow, like and comment")
-	unfollow = flag.Bool("sync", false, "Use this option to unfollow those who are not following back")
-	nomail = flag.Bool("nomail", false, "Use this option to disable the email notifications")
 	dev = flag.Bool("dev", false, "Use this option to use the script in development mode : nothing will be done for real")
 	logs := flag.Bool("logs", false, "Use this option to enable the logfile")
 
@@ -131,35 +119,18 @@ func getConfig() {
 	report = make(map[line]int)
 }
 
-// Sends an email. Check out the "mail" section of the "config.json" file.
+// Sends an telegram. Check out the "telegram" section of the "config.json" file.
 func send(body string, success bool) {
-	if !*nomail {
-		from := viper.GetString("user.mail.from")
-		pass := viper.GetString("user.mail.password")
-		to := viper.GetString("user.mail.to")
-
-		status := func() string {
-			if success {
-				return "Success!"
-			}
-			return "Failure!"
-		}()
-		msg := "From: " + from + "\n" +
-			"To: " + to + "\n" +
-			"Subject:" + status + "  go-instabot\n\n" +
-			body
-
-		err := smtp.SendMail(viper.GetString("user.mail.smtp"),
-			smtp.PlainAuth("", from, pass, viper.GetString("user.mail.server")),
-			from, []string{to}, []byte(msg))
-
-		if err != nil {
-			log.Printf("smtp error: %s", err)
-			return
-		}
-
-		log.Print("sent")
+	bot, err := tgbotapi.NewBotAPI(viper.GetString("user.telegram.token"))
+	if err != nil {
+		log.Panic(err)
 	}
+
+	bot.Debug = false
+	log.Printf("Authorized on account %s", bot.Self.UserName)
+
+	msg := tgbotapi.NewMessage(viper.GetInt64("user.telegram.id"), body)
+	bot.Send(msg)
 }
 
 // Retries the same function [function], a certain number of times (maxAttempts).
@@ -193,28 +164,4 @@ func buildLine() {
 	if reportTag != "" {
 		log.Println(strings.TrimSuffix(reportTag, " - "))
 	}
-}
-
-// Builds the report prints it and sends it
-func buildReport() {
-	reportAsString := ""
-	for index, element := range report {
-		var times string
-		if element == 1 {
-			times = "time"
-		} else {
-			times = "times"
-		}
-		if index.Action == "like" {
-			reportAsString += fmt.Sprintf("#%s has been liked %d %s\n", index.Tag, element, times)
-		} else {
-			reportAsString += fmt.Sprintf("#%s has been %sed %d %s\n", index.Tag, index.Action, element, times)
-		}
-	}
-
-	// Displays the report on the screen / log file
-	fmt.Println(reportAsString)
-
-	// Sends the report to the email in the config file, if the option is enabled
-	send(reportAsString, true)
 }

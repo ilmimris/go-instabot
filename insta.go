@@ -29,29 +29,30 @@ func login() {
 }
 
 func syncFollowers() {
-	following, err := insta.SelfTotalUserFollowing()
-	check(err)
-	followers, err := insta.SelfTotalUserFollowers()
-	check(err)
+	for msg := range unfollow_req {
+		following, err := insta.SelfTotalUserFollowing()
+		check(err)
+		followers, err := insta.SelfTotalUserFollowers()
+		check(err)
 
-	var users []response.User
-	for _, user := range following.Users {
-		if !contains(followers.Users, user) {
-			users = append(users, user)
+		var users []response.User
+		for _, user := range following.Users {
+			if !contains(followers.Users, user) {
+				users = append(users, user)
+			}
 		}
-	}
-	fmt.Printf("\n%d users are not following you back!\n", len(users))
-	answer := getInput("Do you want to unfollow these users? [yN]")
-	if answer != "y" {
-		fmt.Println("Not unfollowing.")
-		os.Exit(0)
-	}
-	for _, user := range users {
-		fmt.Printf("Unfollowing %s\n", user.Username)
-		if !*dev {
-			insta.UnFollow(user.ID)
+
+		if len(users) > 0 {
+			fmt.Printf("\n%d users are not following you back!\n", len(users))
+			for _, user := range users {
+				fmt.Printf("Unfollowing %s\n", user.Username)
+				if !*dev {
+					insta.UnFollow(user.ID)
+				}
+				time.Sleep(6 * time.Second)
+			}
+			unfollow_res <- UnfollowResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", len(users)), msg}
 		}
-		time.Sleep(6 * time.Second)
 	}
 }
 
@@ -124,22 +125,44 @@ func createKey() []byte {
 
 // Go through all the tags in the list
 func loopTags() {
-	for tag = range tagsList {
-		limitsConf := viper.GetStringMap("tags." + tag)
-		// Some converting
-		limits = map[string]int{
-			"follow":  int(limitsConf["follow"].(float64)),
-			"like":    int(limitsConf["like"].(float64)),
-			"comment": int(limitsConf["comment"].(float64)),
-		}
-		// What we did so far
-		numFollowed = 0
-		numLiked = 0
-		numCommented = 0
+	for msg := range follow_req {
+		for tag = range tagsList {
+			limitsConf := viper.GetStringMap("tags." + tag)
+			// Some converting
+			limits = map[string]int{
+				"follow":  int(limitsConf["follow"].(float64)),
+				"like":    int(limitsConf["like"].(float64)),
+				"comment": int(limitsConf["comment"].(float64)),
+			}
+			// What we did so far
+			numFollowed = 0
+			numLiked = 0
+			numCommented = 0
 
-		browse()
+			browse()
+		}
+
+		reportAsString := ""
+		for index, element := range report {
+			var times string
+			if element == 1 {
+				times = "time"
+			} else {
+				times = "times"
+			}
+			if index.Action == "like" {
+				reportAsString += fmt.Sprintf("#%s has been liked %d %s\n", index.Tag, element, times)
+			} else {
+				reportAsString += fmt.Sprintf("#%s has been %sed %d %s\n", index.Tag, index.Action, element, times)
+			}
+		}
+
+		// Displays the report on the screen / log file
+		fmt.Println(reportAsString)
+
+		// Sends the report to the email in the config file, if the option is enabled
+		follow_res <- FollowResponse{reportAsString, msg}
 	}
-	buildReport()
 }
 
 // Browses the page for a certain tag, until we reach the limits
@@ -230,7 +253,7 @@ func goThrough(images response.TagFeedsResponse) {
 
 // Likes an image, if not liked already
 func likeImage(image response.MediaItemResponse) {
-	log.Println("Liking the picture")
+	log.Println("Liking the picture https://www.instagram.com/p/" + image.Code)
 	if !image.HasLiked {
 		if !*dev {
 			insta.Like(image.ID)
