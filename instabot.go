@@ -112,6 +112,20 @@ func main() {
 						bot.Send(msg)
 						unfollow_req <- *update.Message
 					}
+				} else if Text == "/progress" {
+					mutex.Lock()
+					var unfollow_progress = "not started"
+					if state["unfollow"] >= 0 {
+						unfollow_progress = fmt.Sprintf("%d%%", state["unfollow"])
+					}
+					var follow_progress = "not started"
+					if state["follow"] >= 0 {
+						follow_progress = fmt.Sprintf("%d%%", state["follow"])
+					}
+					mutex.Unlock()
+					msg.Text = fmt.Sprintf("Unfollow — %s\nFollow — %s", unfollow_progress, follow_progress)
+					bot.Send(msg)
+
 				} else if reply != "" {
 					msg.Text = reply
 					bot.Send(msg)
