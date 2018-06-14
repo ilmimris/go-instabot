@@ -30,8 +30,6 @@ func login() {
 
 func syncFollowers() {
 	for msg := range unfollow_req {
-		fmt.Printf("Unfollow state %s\n", state["unfollow"])
-
 		following, err := insta.SelfTotalUserFollowing()
 		check(err)
 		followers, err := insta.SelfTotalUserFollowers()
@@ -54,10 +52,20 @@ func syncFollowers() {
 			for _, user := range users {
 				current += 1
 				mutex.Lock()
+				if state["unfollow_cancel"] > 0 {
+					state["unfollow_cancel"] = 0
+					state["unfollow"] = -1
+					mutex.Unlock()
+					unfollow_res <- UnfollowResponse{"Unfollowing canceled", msg}
+					return
+				}
 				state["unfollow"] = int(current * 100 / all_count)
+				state["unfollow_current"] = current
+				state["unfollow_all_count"] = all_count
+
 				mutex.Unlock()
 
-				fmt.Printf("Unfollowing %s (%d%%)\n", user.Username, state["unfollow"])
+				fmt.Printf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])
 				if !*dev {
 					insta.UnFollow(user.ID)
 				}
@@ -150,7 +158,17 @@ func loopTags() {
 			for tag = range tagsList {
 				current += 1
 				mutex.Lock()
+				if state["follow_cancel"] > 0 {
+					state["follow_cancel"] = 0
+					state["follow"] = -1
+					mutex.Unlock()
+					follow_res <- FollowResponse{"Following canceled", msg}
+					return
+				}
+
 				state["follow"] = int(current * 100 / all_count)
+				state["follow_current"] = current
+				state["follow_all_count"] = all_count
 				mutex.Unlock()
 
 				limitsConf := viper.GetStringMap("tags." + tag)

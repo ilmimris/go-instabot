@@ -88,6 +88,7 @@ func main() {
 
 				if Text == "/follow" {
 					mutex.Lock()
+					state["follow_cancel"] = 0
 					if state["follow"] >= 0 {
 						mutex.Unlock()
 						msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
@@ -101,6 +102,7 @@ func main() {
 					}
 				} else if Text == "/unfollow" {
 					mutex.Lock()
+					state["unfollow_cancel"] = 0
 					if state["unfollow"] >= 0 {
 						mutex.Unlock()
 						msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
@@ -116,16 +118,24 @@ func main() {
 					mutex.Lock()
 					var unfollow_progress = "not started"
 					if state["unfollow"] >= 0 {
-						unfollow_progress = fmt.Sprintf("%d%%", state["unfollow"])
+						unfollow_progress = fmt.Sprintf("%d%% [%d/%d]", state["unfollow"], state["unfollow_current"], state["unfollow_all_count"])
 					}
 					var follow_progress = "not started"
 					if state["follow"] >= 0 {
-						follow_progress = fmt.Sprintf("%d%%", state["follow"])
+						follow_progress = fmt.Sprintf("%d%% [%d/%d]", state["follow"], state["follow_current"], state["follow_all_count"])
 					}
 					mutex.Unlock()
 					msg.Text = fmt.Sprintf("Unfollow — %s\nFollow — %s", unfollow_progress, follow_progress)
 					bot.Send(msg)
 
+				} else if Text == "/cancelfollow" {
+					mutex.Lock()
+					state["follow_cancel"] = 1
+					mutex.Unlock()
+				} else if Text == "/cancelunfollow" {
+					mutex.Lock()
+					state["unfollow_cancel"] = 1
+					mutex.Unlock()
 				} else if reply != "" {
 					msg.Text = reply
 					bot.Send(msg)
