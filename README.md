@@ -29,7 +29,6 @@ The script is coded so that your Instagram account will not get banned ; it wait
 
 The first time it logs you in, it will store the session object in a file, encrypted with AES (thanks to [goinsta](https://github.com/ahmdrz/goinsta)). Every next launch will try to recover the session instead of logging in again. This is a trick to avoid getting banned for connecting on too many devices (as suggested by [anastalaz](https://github.com/tducasse/go-instabot/issues/1)).
 
-
 # How to use
 ## Installation
 
@@ -45,6 +44,8 @@ Go to the project folder :
 
 `cd [YOUR_GO_PATH]/src/github.com/tducasse/go-instabot`
 
+For your telegram id ask [@getidsbot](https://t.me/getidsbot), for bot token ask [@BotFather](https://t.me/BotFather)
+
 There, in the 'dist/' folder, you will find a sample 'config.json', that you have to copy to the 'config/' folder :
 
 ```go
@@ -54,12 +55,9 @@ There, in the 'dist/' folder, you will find a sample 'config.json', that you hav
             "username" : "foobar",          // your instagram username
             "password" : "fooBAR"           // your instagram password
         },
-        "mail" : {
-            "from" : "foo@bar.foo",         // the address from which you want to send the emails
-            "password" : "foOb@r",          // the password for this email address
-            "to" : "bar@foo.bar",           // the address to which you want to send the emails
-            "smtp" : "smtp.gmail.com:587",  // the smtp address for your mail server
-            "server" : "smtp.gmail.com"     // the domain name for your server
+        "telegram" : {          
+            "id" : 123,                   // bot owner ID
+            "token" : ".....:....._.....",// bot token
         }
     },
     "limits" : {                            // this sets when the script will choose to do something
@@ -97,20 +95,6 @@ There, in the 'dist/' folder, you will find a sample 'config.json', that you hav
 }
 ```
 
-### Note on the emails
-
-I use Gmail to send and receive the emails. If you want to use Gmail, there's something important to do first (from the [Google accounts](https://support.google.com/accounts/answer/6010255) website) :
-```
-Change your settings to allow less secure apps to access your account.
-We don't recommend this option because it might make it easier for someone to break into your account.
-If you want to allow access anyway, follow these steps:
-    - Go to the "Less secure apps" section in My Account.
-    - Next to "Access for less secure apps," select Turn on.
-```
-(If you can't find where it is exactly, I think [this link](https://myaccount.google.com/security) should work)
-
-As this procedure might not be safe, I recommend not doing it on your main Gmail account, and maybe create another account on the side. Or try to find a less secure webmail provider!
-
 ## How to run
 This is it!
 Since you used the `go get` command, you now have the `go-instabot` executable available from anywhere* in your system. Just launch it in a terminal :
@@ -120,17 +104,11 @@ Since you used the `go get` command, you now have the `go-instabot` executable a
 **\*** : *You will need to have a folder named 'config' (with a 'config.json' file) in the directory where you launch it.*
 
 ### Options
-**-run** : This is the main option. Use it to actually launch the script.
-
 **-h** : Use this option to display the list of options.
 
 **-dev** : Use this option to use the script in development mode : nothing will be done for real. You will need to put a config file in a 'local' folder.
 
 **-logs** : Use this option to enable the logfile. The script will continue writing everything on the screen, but it will also write it in a .log file.
-
-**-nomail** : Use this option to disable the email notifications.
-
-**-sync** : Use this option to unfollow users that don't follow you back. Don't worry, the script will ask before actually doing it, so you can use it just to check the number!
 
 ### Tips
 - If you want to launch a long session, and you're afraid of closing the terminal, I recommend using the command __screen__.
