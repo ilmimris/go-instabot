@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
-	"github.com/spf13/viper"
+	"sync"
 
+	"github.com/spf13/viper"
 	"gopkg.in/telegram-bot-api.v4"
 )
 
@@ -24,9 +26,15 @@ var (
 
 	follow_res   chan FollowResponse
 	unfollow_res chan UnfollowResponse
+
+	state = make(map[string]int)
+	mutex = &sync.Mutex{}
 )
 
 func main() {
+	state["follow"] = -1
+	state["unfollow"] = -1
+
 	// Gets the command line options
 	parseOptions()
 	// Gets the config
@@ -79,13 +87,31 @@ func main() {
 				msg := tgbotapi.NewMessage(UserID, "")
 
 				if Text == "/follow" {
-					follow_req <- *update.Message
-					msg.Text = "Starting follow"
-					bot.Send(msg)
+					mutex.Lock()
+					if state["follow"] >= 0 {
+						mutex.Unlock()
+						msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
+						bot.Send(msg)
+					} else {
+						state["follow"] = 0
+						mutex.Unlock()
+						follow_req <- *update.Message
+						msg.Text = "Starting follow"
+						bot.Send(msg)
+					}
 				} else if Text == "/unfollow" {
-					unfollow_req <- *update.Message
-					msg.Text = "Starting unfollow"
-					bot.Send(msg)
+					mutex.Lock()
+					if state["unfollow"] >= 0 {
+						mutex.Unlock()
+						msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
+						bot.Send(msg)
+					} else {
+						state["unfollow"] = 0
+						mutex.Unlock()
+						msg.Text = "Starting unfollow"
+						bot.Send(msg)
+						unfollow_req <- *update.Message
+					}
 				} else if reply != "" {
 					msg.Text = reply
 					bot.Send(msg)

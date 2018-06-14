@@ -30,6 +30,8 @@ func login() {
 
 func syncFollowers() {
 	for msg := range unfollow_req {
+		fmt.Printf("Unfollow state %s\n", state["unfollow"])
+
 		following, err := insta.SelfTotalUserFollowing()
 		check(err)
 		followers, err := insta.SelfTotalUserFollowers()
@@ -42,16 +44,31 @@ func syncFollowers() {
 			}
 		}
 
-		if len(users) > 0 {
-			fmt.Printf("\n%d users are not following you back!\n", len(users))
+		var all_count = len(users)
+		if all_count > 0 {
+			var current = 0
+
+			fmt.Printf("\n%d users are not following you back!\n", all_count)
+			unfollow_res <- UnfollowResponse{fmt.Sprintf("%d will be unfollowed", all_count), msg}
+
 			for _, user := range users {
-				fmt.Printf("Unfollowing %s\n", user.Username)
+				current += 1
+				mutex.Lock()
+				state["unfollow"] = int(current * 100 / all_count)
+				mutex.Unlock()
+
+				fmt.Printf("Unfollowing %s (%d%%)\n", user.Username, state["unfollow"])
 				if !*dev {
 					insta.UnFollow(user.ID)
 				}
 				time.Sleep(6 * time.Second)
 			}
-			unfollow_res <- UnfollowResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", len(users)), msg}
+
+			mutex.Lock()
+			state["unfollow"] = -1
+			mutex.Unlock()
+
+			unfollow_res <- UnfollowResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", all_count), msg}
 		}
 	}
 }
@@ -126,20 +143,30 @@ func createKey() []byte {
 // Go through all the tags in the list
 func loopTags() {
 	for msg := range follow_req {
-		for tag = range tagsList {
-			limitsConf := viper.GetStringMap("tags." + tag)
-			// Some converting
-			limits = map[string]int{
-				"follow":  int(limitsConf["follow"].(float64)),
-				"like":    int(limitsConf["like"].(float64)),
-				"comment": int(limitsConf["comment"].(float64)),
-			}
-			// What we did so far
-			numFollowed = 0
-			numLiked = 0
-			numCommented = 0
+		var all_count = len(tagsList)
+		if all_count > 0 {
+			var current = 0
 
-			browse()
+			for tag = range tagsList {
+				current += 1
+				mutex.Lock()
+				state["follow"] = int(current * 100 / all_count)
+				mutex.Unlock()
+
+				limitsConf := viper.GetStringMap("tags." + tag)
+				// Some converting
+				limits = map[string]int{
+					"follow":  int(limitsConf["follow"].(float64)),
+					"like":    int(limitsConf["like"].(float64)),
+					"comment": int(limitsConf["comment"].(float64)),
+				}
+				// What we did so far
+				numFollowed = 0
+				numLiked = 0
+				numCommented = 0
+
+				browse()
+			}
 		}
 
 		reportAsString := ""
