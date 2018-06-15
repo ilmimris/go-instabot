@@ -191,19 +191,16 @@ func loopTags() {
 				browse()
 			}
 		}
+		mutex.Lock()
+		state["follow"] = -1
+		mutex.Unlock()
 
 		reportAsString := ""
 		for index, element := range report {
-			var times string
-			if element == 1 {
-				times = "time"
-			} else {
-				times = "times"
-			}
 			if index.Action == "like" {
-				reportAsString += fmt.Sprintf("#%s has been liked %d %s\n", index.Tag, element, times)
+				reportAsString += fmt.Sprintf("#%s liked: %d\n", index.Tag, element)
 			} else {
-				reportAsString += fmt.Sprintf("#%s has been %sed %d %s\n", index.Tag, index.Action, element, times)
+				reportAsString += fmt.Sprintf("#%s %sed: %d\n", index.Tag, index.Action, element)
 			}
 		}
 
