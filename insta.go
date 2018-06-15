@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"strings"
@@ -42,7 +43,7 @@ func syncFollowers() {
 			}
 		}
 
-		var all_count = len(users)
+		var all_count = int(math.Max(float64(len(users)), 1000))
 		if all_count > 0 {
 			var current = 0
 
@@ -51,6 +52,10 @@ func syncFollowers() {
 
 			for _, user := range users {
 				current += 1
+				if current >= 1000 {
+					continue
+				}
+
 				mutex.Lock()
 				if state["unfollow_cancel"] > 0 {
 					state["unfollow_cancel"] = 0
@@ -69,7 +74,7 @@ func syncFollowers() {
 				if !*dev {
 					insta.UnFollow(user.ID)
 				}
-				time.Sleep(6 * time.Second)
+				time.Sleep(10 * time.Second)
 			}
 
 			mutex.Lock()
