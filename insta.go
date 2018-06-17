@@ -43,7 +43,7 @@ func syncFollowers() {
 			}
 		}
 
-		var all_count = int(math.Max(float64(len(users)), 1000))
+		var all_count = int(math.Min(float64(len(users)), 1000))
 		if all_count > 0 {
 			var current = 0
 
