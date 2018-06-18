@@ -64,6 +64,7 @@ func syncFollowers() {
 					unfollow_res <- UnfollowResponse{"Unfollowing canceled", msg}
 					return
 				}
+
 				state["unfollow"] = int(current * 100 / all_count)
 				state["unfollow_current"] = current
 				state["unfollow_all_count"] = all_count
@@ -246,6 +247,14 @@ func browse() {
 func goThrough(images response.TagFeedsResponse) {
 	var i = 1
 	for _, image := range images.FeedsResponse.Items {
+		mutex.Lock()
+		if state["follow_cancel"] > 0 {
+			state["follow_cancel"] = 0
+			state["follow"] = -1
+			mutex.Unlock()
+			return
+		}
+		mutex.Unlock()
 		// Exiting the loop if there is nothing left to do
 		if numFollowed >= limits["follow"] && numLiked >= limits["like"] && numCommented >= limits["comment"] {
 			break

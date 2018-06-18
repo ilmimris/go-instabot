@@ -70,15 +70,16 @@ func main() {
 		log.Fatalf("[INIT] [Failed to init Telegram updates chan: %v]", err)
 	}
 
+	UserID := viper.GetInt64("user.telegram.id")
+
 	// for update := range updates {
 	// read updated
 	for { //update := range updates {
 		select {
 		case update := <-updates:
 			// UserName := update.Message.From.UserName
-			UserID := int64(update.Message.From.ID)
 
-			if int64(update.Message.From.ID) == viper.GetInt64("user.telegram.id") {
+			if int64(update.Message.From.ID) == UserID {
 				// ChatID := update.Message.Chat.ID
 
 				Text := update.Message.Text
@@ -172,14 +173,14 @@ func main() {
 			if edit_message["follow"] > 0 {
 				edit := tgbotapi.EditMessageTextConfig{
 					BaseEdit: tgbotapi.BaseEdit{
-						ChatID:    resp.m.Chat.ID,
+						ChatID:    UserID,
 						MessageID: edit_message["follow"],
 					},
 					Text: resp.body,
 				}
 				bot.Send(edit)
 			} else {
-				msg := tgbotapi.NewMessage(resp.m.Chat.ID, resp.body)
+				msg := tgbotapi.NewMessage(UserID, resp.body)
 				msg.ReplyToMessageID = resp.m.MessageID
 				bot.Send(msg)
 			}
@@ -187,14 +188,14 @@ func main() {
 			if edit_message["unfollow"] > 0 {
 				edit := tgbotapi.EditMessageTextConfig{
 					BaseEdit: tgbotapi.BaseEdit{
-						ChatID:    resp.m.Chat.ID,
+						ChatID:    UserID,
 						MessageID: edit_message["unfollow"],
 					},
 					Text: resp.body,
 				}
 				bot.Send(edit)
 			} else {
-				msg := tgbotapi.NewMessage(resp.m.Chat.ID, resp.body)
+				msg := tgbotapi.NewMessage(UserID, resp.body)
 				msg.ReplyToMessageID = resp.m.MessageID
 				bot.Send(msg)
 			}
