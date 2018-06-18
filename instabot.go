@@ -163,11 +163,11 @@ func main() {
 				} else if Text == "/cancelfollow" {
 					mutex.Lock()
 					state["follow_cancel"] = 1
-					mutex.Unock()
+					mutex.Unlock()
 				} else if Text == "/cancelunfollow" {
 					mutex.Lock()
 					state["unfollow_cancel"] = 1
-					mutex.Unock()
+					mutex.Unlock()
 				} else if reply != "" {
 					msg.Text = reply
 					bot.Send(msg)
