@@ -221,6 +221,14 @@ func loopTags() {
 func browse() {
 	var i = 0
 	for numFollowed < limits["follow"] || numLiked < limits["like"] || numCommented < limits["comment"] {
+		mutex.Lock()
+		if state["follow_cancel"] > 0 {
+			state["follow_cancel"] = 0
+			state["follow"] = -1
+			mutex.Unlock()
+			return
+		}
+		mutex.Unlock()
 		log.Println("Fetching the list of images for #" + tag + "\n")
 		i++
 
