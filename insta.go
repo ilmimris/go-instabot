@@ -223,8 +223,6 @@ func browse() {
 	for numFollowed < limits["follow"] || numLiked < limits["like"] || numCommented < limits["comment"] {
 		mutex.Lock()
 		if state["follow_cancel"] > 0 {
-			state["follow_cancel"] = 0
-			state["follow"] = -1
 			mutex.Unlock()
 			return
 		}
@@ -257,8 +255,6 @@ func goThrough(images response.TagFeedsResponse) {
 	for _, image := range images.FeedsResponse.Items {
 		mutex.Lock()
 		if state["follow_cancel"] > 0 {
-			state["follow_cancel"] = 0
-			state["follow"] = -1
 			mutex.Unlock()
 			return
 		}
