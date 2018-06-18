@@ -161,9 +161,13 @@ func main() {
 						edit_message["progress"] = msg_res.MessageID
 					}
 				} else if Text == "/cancelfollow" {
+					mutex.Lock()
 					state["follow_cancel"] = 1
+					mutex.Unock()
 				} else if Text == "/cancelunfollow" {
+					mutex.Lock()
 					state["unfollow_cancel"] = 1
+					mutex.Unock()
 				} else if reply != "" {
 					msg.Text = reply
 					bot.Send(msg)
