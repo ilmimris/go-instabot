@@ -74,6 +74,7 @@ func syncFollowers() {
 				if !*dev {
 					insta.UnFollow(user.ID)
 				}
+				unfollow_res <- UnfollowResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"]), msg}
 				time.Sleep(10 * time.Second)
 			}
 
@@ -188,8 +189,11 @@ func loopTags() {
 				numLiked = 0
 				numCommented = 0
 
+				fmt.Printf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
 				browse()
+				follow_res <- FollowResponse{fmt.Sprintf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"]), msg}
 			}
+			follow_res <- FollowResponse{"Finished", msg}
 		}
 		mutex.Lock()
 		state["follow"] = -1

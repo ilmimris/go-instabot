@@ -27,8 +27,9 @@ var (
 	follow_res   chan FollowResponse
 	unfollow_res chan UnfollowResponse
 
-	state = make(map[string]int)
-	mutex = &sync.Mutex{}
+	state        = make(map[string]int)
+	edit_message = make(map[string]int)
+	mutex        = &sync.Mutex{}
 )
 
 func main() {
@@ -87,35 +88,64 @@ func main() {
 				msg := tgbotapi.NewMessage(UserID, "")
 
 				if Text == "/follow" {
-					mutex.Lock()
+
 					state["follow_cancel"] = 0
 					if state["follow"] >= 0 {
-						mutex.Unlock()
 						msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
-						bot.Send(msg)
+						if edit_message["follow"] > 0 {
+							edit := tgbotapi.EditMessageTextConfig{
+								BaseEdit: tgbotapi.BaseEdit{
+									ChatID:    UserID,
+									MessageID: edit_message["follow"],
+								},
+								Text: msg.Text,
+							}
+							bot.Send(edit)
+						} else {
+							msg_res, err := bot.Send(msg)
+							if err == nil {
+								edit_message["follow"] = msg_res.MessageID
+							}
+						}
 					} else {
 						state["follow"] = 0
-						mutex.Unlock()
-						follow_req <- *update.Message
 						msg.Text = "Starting follow"
-						bot.Send(msg)
+						msg_res, err := bot.Send(msg)
+						if err == nil {
+							edit_message["follow"] = msg_res.MessageID
+						}
+						follow_req <- *update.Message
 					}
 				} else if Text == "/unfollow" {
-					mutex.Lock()
 					state["unfollow_cancel"] = 0
 					if state["unfollow"] >= 0 {
-						mutex.Unlock()
 						msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
-						bot.Send(msg)
+						if edit_message["unfollow"] > 0 {
+							edit := tgbotapi.EditMessageTextConfig{
+								BaseEdit: tgbotapi.BaseEdit{
+									ChatID:    UserID,
+									MessageID: edit_message["unfollow"],
+								},
+								Text: msg.Text,
+							}
+							bot.Send(edit)
+						} else {
+							msg_res, err := bot.Send(msg)
+							if err == nil {
+								log.Print(msg_res, msg_res.MessageID)
+								edit_message["unfollow"] = msg_res.MessageID
+							}
+						}
 					} else {
 						state["unfollow"] = 0
-						mutex.Unlock()
 						msg.Text = "Starting unfollow"
-						bot.Send(msg)
+						msg_res, err := bot.Send(msg)
+						if err == nil {
+							edit_message["unfollow"] = msg_res.MessageID
+						}
 						unfollow_req <- *update.Message
 					}
 				} else if Text == "/progress" {
-					mutex.Lock()
 					var unfollow_progress = "not started"
 					if state["unfollow"] >= 0 {
 						unfollow_progress = fmt.Sprintf("%d%% [%d/%d]", state["unfollow"], state["unfollow_current"], state["unfollow_all_count"])
@@ -124,32 +154,50 @@ func main() {
 					if state["follow"] >= 0 {
 						follow_progress = fmt.Sprintf("%d%% [%d/%d]", state["follow"], state["follow_current"], state["follow_all_count"])
 					}
-					mutex.Unlock()
 					msg.Text = fmt.Sprintf("Unfollow — %s\nFollow — %s", unfollow_progress, follow_progress)
-					bot.Send(msg)
-
+					msg_res, err := bot.Send(msg)
+					if err != nil {
+						edit_message["progress"] = msg_res.MessageID
+					}
 				} else if Text == "/cancelfollow" {
-					mutex.Lock()
 					state["follow_cancel"] = 1
-					mutex.Unlock()
 				} else if Text == "/cancelunfollow" {
-					mutex.Lock()
 					state["unfollow_cancel"] = 1
-					mutex.Unlock()
 				} else if reply != "" {
 					msg.Text = reply
 					bot.Send(msg)
 				}
 			}
 		case resp := <-follow_res:
-			msg := tgbotapi.NewMessage(resp.m.Chat.ID, resp.body)
-			msg.ReplyToMessageID = resp.m.MessageID
-			bot.Send(msg)
+			if edit_message["follow"] > 0 {
+				edit := tgbotapi.EditMessageTextConfig{
+					BaseEdit: tgbotapi.BaseEdit{
+						ChatID:    resp.m.Chat.ID,
+						MessageID: edit_message["follow"],
+					},
+					Text: resp.body,
+				}
+				bot.Send(edit)
+			} else {
+				msg := tgbotapi.NewMessage(resp.m.Chat.ID, resp.body)
+				msg.ReplyToMessageID = resp.m.MessageID
+				bot.Send(msg)
+			}
 		case resp := <-unfollow_res:
-			msg := tgbotapi.NewMessage(resp.m.Chat.ID, resp.body)
-			msg.ReplyToMessageID = resp.m.MessageID
-			bot.Send(msg)
+			if edit_message["unfollow"] > 0 {
+				edit := tgbotapi.EditMessageTextConfig{
+					BaseEdit: tgbotapi.BaseEdit{
+						ChatID:    resp.m.Chat.ID,
+						MessageID: edit_message["unfollow"],
+					},
+					Text: resp.body,
+				}
+				bot.Send(edit)
+			} else {
+				msg := tgbotapi.NewMessage(resp.m.Chat.ID, resp.body)
+				msg.ReplyToMessageID = resp.m.MessageID
+				bot.Send(msg)
+			}
 		}
-
 	}
 }
