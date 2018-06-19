@@ -59,10 +59,9 @@ func syncFollowers() {
 				mutex.Lock()
 				if state["unfollow_cancel"] > 0 {
 					state["unfollow_cancel"] = 0
-					state["unfollow"] = -1
 					mutex.Unlock()
 					unfollow_res <- UnfollowResponse{"Unfollowing canceled", msg}
-					return
+					break
 				}
 
 				state["unfollow"] = int(current * 100 / all_count)
@@ -83,7 +82,7 @@ func syncFollowers() {
 			state["unfollow"] = -1
 			mutex.Unlock()
 
-			unfollow_res <- UnfollowResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", all_count), msg}
+			unfollow_res <- UnfollowResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", current), msg}
 		}
 	}
 }
