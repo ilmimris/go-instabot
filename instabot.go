@@ -110,6 +110,7 @@ func main() {
 						}
 					} else {
 						state["follow"] = 0
+						report = make(map[line]int)
 						msg.Text = "Starting follow"
 						msg_res, err := bot.Send(msg)
 						if err == nil {
