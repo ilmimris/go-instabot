@@ -53,12 +53,12 @@ func main() {
 	go login()
 	// создаем канал
 	followReq = make(chan tgbotapi.Message, 5)
-	go loopTags()
+	go loopTags(db)
 	followRes = make(chan FollowResponse, 5)
 
 	// создаем канал
 	unfollowReq = make(chan tgbotapi.Message, 15)
-	go syncFollowers()
+	go syncFollowers(db)
 	unfollowRes = make(chan UnfollowResponse, 15)
 
 	bot, err := tgbotapi.NewBotAPI(viper.GetString("user.telegram.token"))
