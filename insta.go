@@ -341,7 +341,7 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 				followUser(db, posterInfo)
 			}
 			if comment {
-				commentImage(db, image)
+				commentImage(db, posterInfo, image)
 			}
 		}
 		log.Printf("%s done\n\n", poster.Username)
@@ -368,16 +368,22 @@ func likeImage(db *bolt.DB, image response.MediaItemResponse) {
 }
 
 // Comments an image
-func commentImage(db *bolt.DB, image response.MediaItemResponse) {
-	rand.Seed(time.Now().Unix())
-	text := commentsList[rand.Intn(len(commentsList))]
-	if !*dev {
-		insta.Comment(image.ID, text)
+func commentImage(db *bolt.DB, userInfo response.GetUsernameResponse, image response.MediaItemResponse) {
+	user := userInfo.User
+	previoslyFollowed, _ := getFollowed(db, user.Username)
+	if previoslyFollowed != "" {
+		log.Printf("%s already following (%s), skipping\n", user.Username, previoslyFollowed)
+	} else {
+		rand.Seed(time.Now().Unix())
+		text := commentsList[rand.Intn(len(commentsList))]
+		if !*dev {
+			insta.Comment(image.ID, text)
+		}
+		log.Println("Commented " + text)
+		numCommented++
+		report[line{tag, "comment"}]++
+		incStats(db, "comment")
 	}
-	log.Println("Commented " + text)
-	numCommented++
-	report[line{tag, "comment"}]++
-	incStats(db, "comment")
 }
 
 // Follows a user, if not following already
