@@ -88,6 +88,7 @@ func syncFollowers(db *bolt.DB) {
 				fmt.Printf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])
 				if !*dev {
 					insta.UnFollow(user.ID)
+					setFollowed(db, user.Username)
 				}
 				unfollowRes <- UnfollowResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"]), msg}
 				time.Sleep(10 * time.Second)
@@ -383,18 +384,24 @@ func commentImage(db *bolt.DB, image response.MediaItemResponse) {
 func followUser(db *bolt.DB, userInfo response.GetUsernameResponse) {
 	user := userInfo.User
 	log.Printf("Following %s\n", user.Username)
-	userFriendShip, err := insta.UserFriendShip(user.ID)
-	check(err)
-	// If not following already
-	if !userFriendShip.Following {
-		if !*dev {
-			insta.Follow(user.ID)
-		}
-		log.Println("Followed")
-		numFollowed++
-		report[line{tag, "follow"}]++
-		incStats(db, "follow")
+	previoslyFollowed, _ := getFollowed(db, user.Username)
+	if previoslyFollowed != "" {
+		log.Printf("%s previously followed at %s, skipping\n", user.Username, previoslyFollowed)
 	} else {
-		log.Println("Already following " + user.Username)
+		userFriendShip, err := insta.UserFriendShip(user.ID)
+		check(err)
+		// If not following already
+		if !userFriendShip.Following {
+			if !*dev {
+				insta.Follow(user.ID)
+			}
+			log.Println("Followed")
+			numFollowed++
+			report[line{tag, "follow"}]++
+			incStats(db, "follow")
+			setFollowed(db, user.Username)
+		} else {
+			log.Println("Already following " + user.Username)
+		}
 	}
 }
