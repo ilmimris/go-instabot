@@ -30,7 +30,7 @@ func login() {
 }
 
 func syncFollowers() {
-	for msg := range unfollow_req {
+	for msg := range unfollowReq {
 		following, err := insta.SelfTotalUserFollowing()
 		check(err)
 		followers, err := insta.SelfTotalUserFollowers()
@@ -43,30 +43,30 @@ func syncFollowers() {
 			}
 		}
 
-		var all_count = int(math.Min(float64(len(users)), 1000))
-		if all_count > 0 {
+		var allCount = int(math.Min(float64(len(users)), 1000))
+		if allCount > 0 {
 			var current = 0
 
-			fmt.Printf("\n%d users are not following you back!\n", all_count)
-			unfollow_res <- UnfollowResponse{fmt.Sprintf("%d will be unfollowed", all_count), msg}
+			fmt.Printf("\n%d users are not following you back!\n", allCount)
+			unfollowRes <- UnfollowResponse{fmt.Sprintf("%d will be unfollowed", allCount), msg}
 
 			for _, user := range users {
-				current += 1
 				if current >= 1000 {
 					continue
 				}
+				current++
 
 				mutex.Lock()
 				if state["unfollow_cancel"] > 0 {
 					state["unfollow_cancel"] = 0
 					mutex.Unlock()
-					unfollow_res <- UnfollowResponse{"Unfollowing canceled", msg}
+					unfollowRes <- UnfollowResponse{"Unfollowing canceled", msg}
 					break
 				}
 
-				state["unfollow"] = int(current * 100 / all_count)
+				state["unfollow"] = int(current * 100 / allCount)
 				state["unfollow_current"] = current
-				state["unfollow_all_count"] = all_count
+				state["unfollow_all_count"] = allCount
 
 				mutex.Unlock()
 
@@ -74,7 +74,7 @@ func syncFollowers() {
 				if !*dev {
 					insta.UnFollow(user.ID)
 				}
-				unfollow_res <- UnfollowResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"]), msg}
+				unfollowRes <- UnfollowResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"]), msg}
 				time.Sleep(10 * time.Second)
 			}
 
@@ -82,7 +82,7 @@ func syncFollowers() {
 			state["unfollow"] = -1
 			mutex.Unlock()
 
-			unfollow_res <- UnfollowResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", current), msg}
+			unfollowRes <- UnfollowResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", current), msg}
 		}
 	}
 }
@@ -156,25 +156,25 @@ func createKey() []byte {
 
 // Go through all the tags in the list
 func loopTags() {
-	for msg := range follow_req {
-		var all_count = len(tagsList)
-		if all_count > 0 {
+	for msg := range followReq {
+		var allCount = len(tagsList)
+		if allCount > 0 {
 			var current = 0
 
 			for tag = range tagsList {
-				current += 1
+				current++
 				mutex.Lock()
 				if state["follow_cancel"] > 0 {
 					state["follow_cancel"] = 0
 					state["follow"] = -1
 					mutex.Unlock()
-					follow_res <- FollowResponse{"Following canceled", msg}
+					followRes <- FollowResponse{"Following canceled", msg}
 					return
 				}
 
-				state["follow"] = int(current * 100 / all_count)
+				state["follow"] = int(current * 100 / allCount)
 				state["follow_current"] = current
-				state["follow_all_count"] = all_count
+				state["follow_all_count"] = allCount
 				mutex.Unlock()
 
 				limitsConf := viper.GetStringMap("tags." + tag)
@@ -191,9 +191,9 @@ func loopTags() {
 
 				fmt.Printf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
 				browse()
-				follow_res <- FollowResponse{fmt.Sprintf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"]), msg}
+				followRes <- FollowResponse{fmt.Sprintf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"]), msg}
 			}
-			follow_res <- FollowResponse{"Finished", msg}
+			followRes <- FollowResponse{"Finished", msg}
 		}
 		mutex.Lock()
 		state["follow"] = -1
@@ -212,7 +212,7 @@ func loopTags() {
 		fmt.Println(reportAsString)
 
 		// Sends the report to the email in the config file, if the option is enabled
-		follow_res <- FollowResponse{reportAsString, msg}
+		followRes <- FollowResponse{reportAsString, msg}
 	}
 }
 
