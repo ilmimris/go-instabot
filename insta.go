@@ -172,6 +172,7 @@ func createKey() []byte {
 // Go through all the tags in the list
 func loopTags(db *bolt.DB) {
 	usersInfo = make(map[string]response.GetUsernameResponse)
+	tagFeed = make(map[string]response.TagFeedsResponse)
 
 	for msg := range followReq {
 		var allCount = len(tagsList)
