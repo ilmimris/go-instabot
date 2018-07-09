@@ -22,6 +22,9 @@ import (
 // Insta is a goinsta.Instagram instance
 var insta *goinsta.Instagram
 
+var usersInfo = make(map[string]response.GetUsernameResponse)
+var tagFeed = make(map[string]response.TagFeedsResponse)
+
 // login will try to reload a previous session, and will create a new one if it can't
 func login() {
 	err := reloadSession()
@@ -168,6 +171,8 @@ func createKey() []byte {
 
 // Go through all the tags in the list
 func loopTags(db *bolt.DB) {
+	usersInfo = make(map[string]response.GetUsernameResponse)
+
 	for msg := range followReq {
 		var allCount = len(tagsList)
 		if allCount > 0 {
@@ -190,6 +195,7 @@ func loopTags(db *bolt.DB) {
 				mutex.Unlock()
 
 				limitsConf := viper.GetStringMap("tags." + tag)
+
 				// Some converting
 				limits = map[string]int{
 					"follow":  int(limitsConf["follow"].(float64)),
@@ -244,12 +250,21 @@ func browse(db *bolt.DB) {
 		// Getting all the pictures we can on the first page
 		// Instagram will return a 500 sometimes, so we will retry 10 times.
 		// Check retry() for more info.
-		var images response.TagFeedsResponse
-		err := retry(10, 20*time.Second, func() (err error) {
-			images, err = insta.TagFeed(tag)
-			return
-		})
-		check(err)
+
+		var images, ok = tagFeed[tag]
+
+		if ok {
+			log.Println("from cache #" + tag)
+		} else {
+			err := retry(10, 20*time.Second, func() (err error) {
+				images, err = insta.TagFeed(tag)
+				if err == nil {
+					tagFeed[tag] = images
+				}
+				return
+			})
+			check(err)
+		}
 
 		goThrough(db, images)
 
@@ -288,12 +303,20 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 		// Getting the user info
 		// Instagram will return a 500 sometimes, so we will retry 10 times.
 		// Check retry() for more info.
-		var posterInfo response.GetUsernameResponse
-		err := retry(10, 20*time.Second, func() (err error) {
-			posterInfo, err = insta.GetUserByID(image.User.ID)
-			return
-		})
-		check(err)
+		var posterInfo, ok = usersInfo[image.User.Username]
+
+		if ok {
+			log.Println("from cache " + posterInfo.User.Username + " - for #" + tag)
+		} else {
+			err := retry(10, 20*time.Second, func() (err error) {
+				posterInfo, err = insta.GetUserByID(image.User.ID)
+				if err == nil {
+					usersInfo[image.User.Username] = posterInfo
+				}
+				return
+			})
+			check(err)
+		}
 
 		poster := posterInfo.User
 		followerCount := poster.FollowerCount
