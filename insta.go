@@ -337,11 +337,11 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 		// Like, then comment/follow
 		if like {
 			likeImage(db, image)
-			if follow {
-				followUser(db, posterInfo)
-			}
 			if comment {
 				commentImage(db, posterInfo, image)
+			}
+			if follow {
+				followUser(db, posterInfo)
 			}
 		}
 		log.Printf("%s done\n\n", poster.Username)
