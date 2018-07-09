@@ -178,6 +178,13 @@ func main() {
 					mutex.Lock()
 					state["unfollow_cancel"] = 1
 					mutex.Unlock()
+				} else if Text == "/stats" {
+					unfollowCount, _ := getStats(db, "unfollow")
+					followCount, _ := getStats(db, "follow")
+					likeCount, _ := getStats(db, "like")
+					commentCount, _ := getStats(db, "comment")
+					msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, likeCount, commentCount)
+					bot.Send(msg)
 				} else if reply != "" {
 					msg.Text = reply
 					bot.Send(msg)

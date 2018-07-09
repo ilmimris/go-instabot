@@ -335,6 +335,7 @@ func likeImage(image response.MediaItemResponse) {
 		log.Println("Liked")
 		numLiked++
 		report[line{tag, "like"}]++
+		incStats(db, "like")
 	} else {
 		log.Println("Image already liked")
 	}
@@ -350,6 +351,7 @@ func commentImage(image response.MediaItemResponse) {
 	log.Println("Commented " + text)
 	numCommented++
 	report[line{tag, "comment"}]++
+	incStats(db, "comment")
 }
 
 // Follows a user, if not following already
@@ -366,6 +368,7 @@ func followUser(userInfo response.GetUsernameResponse) {
 		log.Println("Followed")
 		numFollowed++
 		report[line{tag, "follow"}]++
+		incStats(db, "follow")
 	} else {
 		log.Println("Already following " + user.Username)
 	}
