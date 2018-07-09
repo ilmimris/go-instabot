@@ -48,6 +48,11 @@ func syncFollowers() {
 			limit = 1000
 		}
 
+		today, _ := getStats(db, "unfollow")
+		if today > 0 {
+			limit = limit - today
+		}
+
 		var allCount = int(math.Min(float64(len(users)), float64(limit)))
 		if allCount > 0 {
 			var current = 0
@@ -60,6 +65,7 @@ func syncFollowers() {
 					continue
 				}
 				current++
+				incStats(db, "unfollow")
 
 				mutex.Lock()
 				if state["unfollow_cancel"] > 0 {

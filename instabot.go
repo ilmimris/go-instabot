@@ -6,6 +6,7 @@ import (
 
 	"sync"
 
+	"github.com/boltdb/bolt"
 	"github.com/spf13/viper"
 	"gopkg.in/telegram-bot-api.v4"
 )
@@ -31,6 +32,7 @@ var (
 	editMessage = make(map[string]int)
 	mutex       = &sync.Mutex{}
 )
+var db *bolt.DB
 
 func main() {
 	state["follow"] = -1
@@ -38,8 +40,15 @@ func main() {
 
 	// Gets the command line options
 	parseOptions()
+
 	// Gets the config
 	getConfig()
+
+	db, err := initBolt()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
 	go login()
 	// создаем канал
