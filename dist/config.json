@@ -1,42 +1,43 @@
 {
-    "user" : {
-        "instagram" : {
-            "username" : "foobar",
-            "password" : "fooBAR"
+    "user": {
+        "instagram": {
+            "username": "foobar",
+            "password": "fooBAR"
         },
-        "telegram" : {
-            "id" : 123,
-            "token" : ".....:......._.....",
+        "telegram": {
+            "id": 123,
+            "token": ".....:......._....."
         }
     },
-    "limits" : {
-        "maxRetry" : 2,
-        "like" : {
-            "min" : 0,
-            "max" : 10000
+    "limits": {
+        "maxSync": 1000,
+        "maxRetry": 2,
+        "like": {
+            "min": 0,
+            "max": 10000
         },
-        "comment" : {
-            "min" : 100,
-            "max" : 10000
+        "comment": {
+            "min": 100,
+            "max": 10000
         },
-        "follow" : {
-            "min" : 200,
-            "max" : 10000
+        "follow": {
+            "min": 200,
+            "max": 10000
         }
     },
-    "tags" : {
-        "dog" : {
-            "like" : 3,
-            "comment" : 2,
-            "follow" : 1
+    "tags": {
+        "dog": {
+            "like": 3,
+            "comment": 2,
+            "follow": 1
         },
-        "cat" : {
-            "like" : 3,
-            "comment" : 2,
-            "follow" : 1
+        "cat": {
+            "like": 3,
+            "comment": 2,
+            "follow": 1
         }
     },
-    "comments" : [
+    "comments": [
         "awesome",
         "wow",
         "nice pic"

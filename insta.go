@@ -43,7 +43,12 @@ func syncFollowers() {
 			}
 		}
 
-		var allCount = int(math.Min(float64(len(users)), 1000))
+		var limit = viper.GetInt("limits.maxSync")
+		if limit <= 0 || limit >= 1000 {
+			limit = 1000
+		}
+
+		var allCount = int(math.Min(float64(len(users)), float64(limit)))
 		if allCount > 0 {
 			var current = 0
 
@@ -51,7 +56,7 @@ func syncFollowers() {
 			unfollowRes <- UnfollowResponse{fmt.Sprintf("%d will be unfollowed", allCount), msg}
 
 			for _, user := range users {
-				if current >= 1000 {
+				if current >= limit {
 					continue
 				}
 				current++
