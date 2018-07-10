@@ -38,99 +38,102 @@ func followFollowers(db *bolt.DB) {
 		time.Sleep(1 * time.Second)
 		username := msg.CommandArguments()
 		user, err := insta.GetUserByUsername(username)
-		check(err)
-
-		if user.User.IsPrivate {
-			userFriendShip, err := insta.UserFriendShip(user.User.ID)
-			check(err)
-			if !userFriendShip.Following {
-				followFollowersRes <- TelegramResponse{"User profile is private and we are not following, can't process"}
+		if err != nil {
+			followFollowersRes <- TelegramResponse{fmt.Sprintf("%s", err)}
+		} else {
+			if user.User.IsPrivate {
+				userFriendShip, err := insta.UserFriendShip(user.User.ID)
+				check(err)
+				if !userFriendShip.Following {
+					followFollowersRes <- TelegramResponse{"User profile is private and we are not following, can't process"}
+				}
 			}
-		}
 
-		followers, err := insta.TotalUserFollowers(user.User.ID)
-		//log.Println(followers)
-		check(err)
-		var users = followers.Users
-		if len(users) > 0 {
-			rand.Seed(time.Now().UnixNano()) // do it once during app initialization
-			Shuffle(users)
-		}
+			followers, err := insta.TotalUserFollowers(user.User.ID)
+			//log.Println(followers)
+			check(err)
+			var users = followers.Users
+			if len(users) > 0 {
+				rand.Seed(time.Now().UnixNano()) // do it once during app initialization
+				Shuffle(users)
+			}
 
-		var limit = viper.GetInt("limits.maxSync")
-		if limit <= 0 || limit >= 1000 {
-			limit = 1000
-		}
+			var limit = viper.GetInt("limits.maxSync")
+			if limit <= 0 || limit >= 1000 {
+				limit = 1000
+			}
 
-		today, _ := getStats(db, "refollow")
-		if today > 0 {
-			limit = limit - today
-		}
+			today, _ := getStats(db, "refollow")
+			if today > 0 {
+				limit = limit - today
+			}
 
-		var allCount = int(math.Min(float64(len(users)), float64(limit)))
-		if allCount > 0 {
-			var current = 0
+			var allCount = int(math.Min(float64(len(users)), float64(limit)))
+			if allCount > 0 {
+				var current = 0
 
-			fmt.Printf("\n%d followers!\n", allCount)
-			followFollowersRes <- TelegramResponse{fmt.Sprintf("%d will be followed", allCount)}
+				fmt.Printf("\n%d followers!\n", allCount)
+				followFollowersRes <- TelegramResponse{fmt.Sprintf("%d will be followed", allCount)}
 
-			for _, user := range users {
-				if current >= limit {
-					continue
-				}
+				for _, user := range users {
+					if current >= limit {
+						continue
+					}
 
-				mutex.Lock()
-				if state["refollow_cancel"] > 0 {
-					state["refollow_cancel"] = 0
-					mutex.Unlock()
-					followFollowersRes <- TelegramResponse{"refollowwing canceled"}
-					break
-				}
+					mutex.Lock()
+					if state["refollow_cancel"] > 0 {
+						state["refollow_cancel"] = 0
+						mutex.Unlock()
+						followFollowersRes <- TelegramResponse{"refollowwing canceled"}
+						break
+					}
 
-				fmt.Printf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
-				if user.IsPrivate {
-					log.Printf("%s is private, skipping\n", user.Username)
-				} else {
-					previoslyFollowed, _ := getFollowed(db, user.Username)
-					if previoslyFollowed != "" {
-						log.Printf("%s previously followed at %s, skipping\n", user.Username, previoslyFollowed)
+					fmt.Printf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
+					if user.IsPrivate {
+						log.Printf("%s is private, skipping\n", user.Username)
 					} else {
-						current++
-						state["refollow"] = int(current * 100 / allCount)
-						state["refollow_current"] = current
-						state["refollow_all_count"] = allCount
-						if !*dev {
-							insta.Follow(user.ID)
-							setFollowed(db, user.Username)
-							incStats(db, "follow")
-							incStats(db, "refollow")
-						}
-						followFollowersRes <- TelegramResponse{fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])}
-						if !*dev {
-							time.Sleep(10 * time.Second)
+						previoslyFollowed, _ := getFollowed(db, user.Username)
+						if previoslyFollowed != "" {
+							log.Printf("%s previously followed at %s, skipping\n", user.Username, previoslyFollowed)
 						} else {
-							time.Sleep(1 * time.Second)
+							current++
+							state["refollow"] = int(current * 100 / allCount)
+							state["refollow_current"] = current
+							state["refollow_all_count"] = allCount
+							if !*dev {
+								insta.Follow(user.ID)
+								setFollowed(db, user.Username)
+								incStats(db, "follow")
+								incStats(db, "refollow")
+							}
+							followFollowersRes <- TelegramResponse{fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])}
+							if !*dev {
+								time.Sleep(10 * time.Second)
+							} else {
+								time.Sleep(1 * time.Second)
+							}
 						}
 					}
-				}
 
-				mutex.Unlock()
+					mutex.Unlock()
+				}
+				followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", current)}
+			} else {
+				followFollowersRes <- TelegramResponse{"followers not found :("}
+				fmt.Println("followers not found :(")
 			}
-			followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", current)}
-		} else {
-			followFollowersRes <- TelegramResponse{"followers not found :("}
-			fmt.Println("followers not found :(")
+			mutex.Lock()
+			state["refollow"] = -1
+			editMessage["refollow"] = -1
+			mutex.Unlock()
 		}
-		mutex.Lock()
-		state["refollow"] = -1
-		editMessage["refollow"] = -1
-		mutex.Unlock()
 	}
 }
 
 func syncFollowers(db *bolt.DB) {
 	for msg := range unfollowReq {
 		log.Println(msg)
+		time.Sleep(1 * time.Second)
 		following, err := insta.SelfTotalUserFollowing()
 		check(err)
 		followers, err := insta.SelfTotalUserFollowers()
@@ -300,6 +303,7 @@ func loopTags(db *bolt.DB) {
 
 	for msg := range followReq {
 		log.Println(msg)
+		time.Sleep(1 * time.Second)
 		var allCount = len(tagsList)
 		if allCount > 0 {
 			var current = 0

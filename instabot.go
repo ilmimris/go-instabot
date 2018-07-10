@@ -107,33 +107,38 @@ func main() {
 				msg := tgbotapi.NewMessage(UserID, "")
 
 				if Command == "refollow" {
-					state["refollow_cancel"] = 0
-					if state["refollow"] >= 0 {
-						msg.Text = fmt.Sprintf("Refollow in progress (%d%%)", state["refollow"])
-						if editMessage["refollow"] > 0 {
-							edit := tgbotapi.EditMessageTextConfig{
-								BaseEdit: tgbotapi.BaseEdit{
-									ChatID:    UserID,
-									MessageID: editMessage["refollow"],
-								},
-								Text: msg.Text,
+					if Args == "" {
+						msg.Text = fmt.Sprintf("/refollow username")
+						bot.Send(msg)
+					} else {
+						state["refollow_cancel"] = 0
+						if state["refollow"] >= 0 {
+							msg.Text = fmt.Sprintf("Refollow in progress (%d%%)", state["refollow"])
+							if editMessage["refollow"] > 0 {
+								edit := tgbotapi.EditMessageTextConfig{
+									BaseEdit: tgbotapi.BaseEdit{
+										ChatID:    UserID,
+										MessageID: editMessage["refollow"],
+									},
+									Text: msg.Text,
+								}
+								bot.Send(edit)
+							} else {
+								msgRes, err := bot.Send(msg)
+								if err == nil {
+									editMessage["refollow"] = msgRes.MessageID
+								}
 							}
-							bot.Send(edit)
 						} else {
+							state["refollow"] = 0
+							report = make(map[line]int)
+							msg.Text = "Starting refollow"
 							msgRes, err := bot.Send(msg)
 							if err == nil {
 								editMessage["refollow"] = msgRes.MessageID
 							}
+							followFollowersReq <- *update.Message
 						}
-					} else {
-						state["refollow"] = 0
-						report = make(map[line]int)
-						msg.Text = "Starting refollow"
-						msgRes, err := bot.Send(msg)
-						if err == nil {
-							editMessage["refollow"] = msgRes.MessageID
-						}
-						followFollowersReq <- *update.Message
 					}
 				} else if Command == "follow" {
 					startFollow(bot)
