@@ -109,7 +109,11 @@ func followFollowers(db *bolt.DB) {
 							setFollowed(db, user.Username)
 						}
 						followFollowersRes <- TelegramResponse{fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"]), msg}
-						time.Sleep(10 * time.Second)
+						if !*dev {
+							time.Sleep(10 * time.Second)
+						} else {
+							time.Sleep(1 * time.Second)
+						}
 					}
 				}
 			}
@@ -141,6 +145,11 @@ func syncFollowers(db *bolt.DB) {
 		var limit = viper.GetInt("limits.maxSync")
 		if limit <= 0 || limit >= 1000 {
 			limit = 1000
+		}
+
+		var daysBeforeUnfollow = viper.GetInt("limits.daysBeforeUnfollow")
+		if daysBeforeUnfollow <= 1 || daysBeforeUnfollow >= 14 {
+			daysBeforeUnfollow = 3
 		}
 
 		today, _ := getStats(db, "unfollow")
@@ -176,13 +185,32 @@ func syncFollowers(db *bolt.DB) {
 
 				mutex.Unlock()
 
+				previoslyFollowed, _ := getFollowed(db, user.Username)
+				if previoslyFollowed != "" {
+					t, err := time.Parse("20060102", previoslyFollowed)
+
+					if err != nil {
+						fmt.Println(err)
+					} else {
+						duration := time.Since(t)
+						if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
+							fmt.Printf("\n%s not followed us less then %f hours, skipping!\n", user.Username, duration.Hours())
+							continue
+						}
+					}
+				}
+
 				fmt.Printf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])
 				if !*dev {
 					insta.UnFollow(user.ID)
 					setFollowed(db, user.Username)
 				}
 				unfollowRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"]), msg}
-				time.Sleep(10 * time.Second)
+				if !*dev {
+					time.Sleep(10 * time.Second)
+				} else {
+					time.Sleep(1 * time.Second)
+				}
 			}
 
 			mutex.Lock()

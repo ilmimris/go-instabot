@@ -11,6 +11,7 @@
     },
     "limits": {
         "maxSync": 1000,
+        "daysBeforeUnfollow": 2,
         "maxRetry": 2,
         "like": {
             "min": 0,
