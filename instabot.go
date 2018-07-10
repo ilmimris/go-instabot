@@ -11,22 +11,19 @@ import (
 	"gopkg.in/telegram-bot-api.v4"
 )
 
-type FollowResponse struct {
-	body string
-	m    tgbotapi.Message
-}
-
-type UnfollowResponse struct {
+type TelegramResponse struct {
 	body string
 	m    tgbotapi.Message
 }
 
 var (
-	followReq   chan tgbotapi.Message
-	unfollowReq chan tgbotapi.Message
+	followReq          chan tgbotapi.Message
+	unfollowReq        chan tgbotapi.Message
+	followFollowersReq chan tgbotapi.Message
 
-	followRes   chan FollowResponse
-	unfollowRes chan UnfollowResponse
+	followRes          chan TelegramResponse
+	unfollowRes        chan TelegramResponse
+	followFollowersRes chan TelegramResponse
 
 	state       = make(map[string]int)
 	editMessage = make(map[string]int)
@@ -37,6 +34,7 @@ var db *bolt.DB
 func main() {
 	state["follow"] = -1
 	state["unfollow"] = -1
+	state["refollow"] = -1
 
 	// Gets the command line options
 	parseOptions()
@@ -52,14 +50,19 @@ func main() {
 
 	go login()
 	// создаем канал
-	followReq = make(chan tgbotapi.Message, 5)
+	followReq = make(chan tgbotapi.Message, 2)
 	go loopTags(db)
-	followRes = make(chan FollowResponse, 5)
+	followRes = make(chan TelegramResponse, 2)
 
 	// создаем канал
-	unfollowReq = make(chan tgbotapi.Message, 15)
+	unfollowReq = make(chan tgbotapi.Message, 2)
 	go syncFollowers(db)
-	unfollowRes = make(chan UnfollowResponse, 15)
+	unfollowRes = make(chan TelegramResponse, 2)
+
+	// создаем канал
+	followFollowersReq = make(chan tgbotapi.Message, 2)
+	go followFollowers(db)
+	followFollowersRes = make(chan TelegramResponse, 2)
 
 	bot, err := tgbotapi.NewBotAPI(viper.GetString("user.telegram.token"))
 	if err != nil {
@@ -92,13 +95,43 @@ func main() {
 				// ChatID := update.Message.Chat.ID
 
 				Text := update.Message.Text
+				Command := update.Message.Command()
+				Args := update.Message.CommandArguments()
 
-				log.Printf("[%d] %s", UserID, Text)
-				var reply string
+				log.Printf("[%d] %s, %s, %s", UserID, Text, Command, Args)
+				// var reply string
 				msg := tgbotapi.NewMessage(UserID, "")
 
-				if Text == "/follow" {
-
+				if Command == "refollow" {
+					state["refollow_cancel"] = 0
+					if state["refollow"] >= 0 {
+						msg.Text = fmt.Sprintf("Refollow in progress (%d%%)", state["refollow"])
+						if editMessage["refollow"] > 0 {
+							edit := tgbotapi.EditMessageTextConfig{
+								BaseEdit: tgbotapi.BaseEdit{
+									ChatID:    UserID,
+									MessageID: editMessage["refollow"],
+								},
+								Text: msg.Text,
+							}
+							bot.Send(edit)
+						} else {
+							msgRes, err := bot.Send(msg)
+							if err == nil {
+								editMessage["refollow"] = msgRes.MessageID
+							}
+						}
+					} else {
+						state["refollow"] = 0
+						report = make(map[line]int)
+						msg.Text = "Starting refollow"
+						msgRes, err := bot.Send(msg)
+						if err == nil {
+							editMessage["refollow"] = msgRes.MessageID
+						}
+						followFollowersReq <- *update.Message
+					}
+				} else if Command == "follow" {
 					state["follow_cancel"] = 0
 					if state["follow"] >= 0 {
 						msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
@@ -127,7 +160,7 @@ func main() {
 						}
 						followReq <- *update.Message
 					}
-				} else if Text == "/unfollow" {
+				} else if Command == "unfollow" {
 					state["unfollow_cancel"] = 0
 					if state["unfollow"] >= 0 {
 						msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
@@ -156,7 +189,7 @@ func main() {
 						}
 						unfollowReq <- *update.Message
 					}
-				} else if Text == "/progress" {
+				} else if Command == "progress" {
 					var unfollowProgress = "not started"
 					if state["unfollow"] >= 0 {
 						unfollowProgress = fmt.Sprintf("%d%% [%d/%d]", state["unfollow"], state["unfollow_current"], state["unfollow_all_count"])
@@ -170,23 +203,27 @@ func main() {
 					if err != nil {
 						editMessage["progress"] = msgRes.MessageID
 					}
-				} else if Text == "/cancelfollow" {
+				} else if Command == "cancelfollow" {
 					mutex.Lock()
 					state["follow_cancel"] = 1
 					mutex.Unlock()
-				} else if Text == "/cancelunfollow" {
+				} else if Command == "cancelunfollow" {
 					mutex.Lock()
 					state["unfollow_cancel"] = 1
 					mutex.Unlock()
-				} else if Text == "/stats" {
+				} else if Command == "cancelrefollow" {
+					mutex.Lock()
+					state["refollow_cancel"] = 1
+					mutex.Unlock()
+				} else if Command == "stats" {
 					unfollowCount, _ := getStats(db, "unfollow")
 					followCount, _ := getStats(db, "follow")
 					likeCount, _ := getStats(db, "like")
 					commentCount, _ := getStats(db, "comment")
 					msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, likeCount, commentCount)
 					bot.Send(msg)
-				} else if reply != "" {
-					msg.Text = reply
+				} else if Text != "" {
+					msg.Text = Text
 					bot.Send(msg)
 				}
 			}
@@ -211,6 +248,21 @@ func main() {
 					BaseEdit: tgbotapi.BaseEdit{
 						ChatID:    UserID,
 						MessageID: editMessage["unfollow"],
+					},
+					Text: resp.body,
+				}
+				bot.Send(edit)
+			} else {
+				msg := tgbotapi.NewMessage(UserID, resp.body)
+				msg.ReplyToMessageID = resp.m.MessageID
+				bot.Send(msg)
+			}
+		case resp := <-followFollowersRes:
+			if editMessage["refollow"] > 0 {
+				edit := tgbotapi.EditMessageTextConfig{
+					BaseEdit: tgbotapi.BaseEdit{
+						ChatID:    UserID,
+						MessageID: editMessage["refollow"],
 					},
 					Text: resp.body,
 				}
