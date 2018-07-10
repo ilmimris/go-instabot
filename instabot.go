@@ -89,12 +89,16 @@ func main() {
 	c.AddFunc("0 0 18 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot) })
 	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db) })
 
+	for _, task := range c.Entries() {
+		log.Println(task.Next)
+	}
+
 	// read updated
 	for { //update := range updates {
 		select {
 		case update := <-updates:
 			// UserName := update.Message.From.UserName
-			log.Println(UserID)
+			// log.Println(UserID)
 			if int64(update.Message.From.ID) == UserID {
 				// ChatID := update.Message.Chat.ID
 
@@ -102,8 +106,8 @@ func main() {
 				Command := update.Message.Command()
 				Args := update.Message.CommandArguments()
 
-				log.Printf("[%d] %s, %s, %s", UserID, Text, Command, Args)
-				// var reply string
+				// log.Printf("[%d] %s, %s, %s", UserID, Text, Command, Args)
+
 				msg := tgbotapi.NewMessage(UserID, "")
 
 				if Command == "refollow" {

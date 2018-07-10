@@ -165,7 +165,7 @@ func syncFollowers(db *bolt.DB) {
 		if allCount > 0 {
 			var current = 0
 
-			fmt.Printf("\n%d users are not following you back!\n", allCount)
+			fmt.Printf("%d users are not following you back!\n", allCount)
 			unfollowRes <- TelegramResponse{fmt.Sprintf("%d will be unfollowed", allCount)}
 
 			for _, user := range users {
@@ -190,7 +190,7 @@ func syncFollowers(db *bolt.DB) {
 					} else {
 						duration := time.Since(t)
 						if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
-							fmt.Printf("\n%s not followed us less then %f hours, skipping!\n", user.Username, duration.Hours())
+							fmt.Printf("%s not followed us less then %f hours, skipping!\n", user.Username, duration.Hours())
 
 							mutex.Unlock()
 							continue
