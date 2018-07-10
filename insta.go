@@ -79,6 +79,7 @@ func followFollowers(db *bolt.DB) {
 					continue
 				}
 				current++
+				incStats(db, "follow")
 				incStats(db, "refollow")
 
 				mutex.Lock()
