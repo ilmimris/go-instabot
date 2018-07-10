@@ -78,7 +78,6 @@ func followFollowers(db *bolt.DB) {
 				if current >= limit {
 					continue
 				}
-				current++
 
 				mutex.Lock()
 				if state["refollow_cancel"] > 0 {
@@ -88,12 +87,6 @@ func followFollowers(db *bolt.DB) {
 					break
 				}
 
-				state["refollow"] = int(current * 100 / allCount)
-				state["refollow_current"] = current
-				state["refollow_all_count"] = allCount
-
-				mutex.Unlock()
-
 				fmt.Printf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
 				if user.IsPrivate {
 					log.Printf("%s is private, skipping\n", user.Username)
@@ -102,6 +95,10 @@ func followFollowers(db *bolt.DB) {
 					if previoslyFollowed != "" {
 						log.Printf("%s previously followed at %s, skipping\n", user.Username, previoslyFollowed)
 					} else {
+						current++
+						state["refollow"] = int(current * 100 / allCount)
+						state["refollow_current"] = current
+						state["refollow_all_count"] = allCount
 						if !*dev {
 							insta.Follow(user.ID)
 							setFollowed(db, user.Username)
@@ -116,6 +113,8 @@ func followFollowers(db *bolt.DB) {
 						}
 					}
 				}
+
+				mutex.Unlock()
 			}
 			followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", current), msg}
 		} else {
@@ -168,7 +167,6 @@ func syncFollowers(db *bolt.DB) {
 				if current >= limit {
 					continue
 				}
-				current++
 
 				mutex.Lock()
 				if state["unfollow_cancel"] > 0 {
@@ -177,12 +175,6 @@ func syncFollowers(db *bolt.DB) {
 					unfollowRes <- TelegramResponse{"Unfollowing canceled", msg}
 					break
 				}
-
-				state["unfollow"] = int(current * 100 / allCount)
-				state["unfollow_current"] = current
-				state["unfollow_all_count"] = allCount
-
-				mutex.Unlock()
 
 				previoslyFollowed, _ := getFollowed(db, user.Username)
 				if previoslyFollowed != "" {
@@ -194,10 +186,19 @@ func syncFollowers(db *bolt.DB) {
 						duration := time.Since(t)
 						if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
 							fmt.Printf("\n%s not followed us less then %f hours, skipping!\n", user.Username, duration.Hours())
+
+							mutex.Unlock()
 							continue
 						}
 					}
 				}
+
+				current++
+				state["unfollow"] = int(current * 100 / allCount)
+				state["unfollow_current"] = current
+				state["unfollow_all_count"] = allCount
+
+				mutex.Unlock()
 
 				fmt.Printf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])
 				if !*dev {
