@@ -96,12 +96,17 @@ func followFollowers(db *bolt.DB) {
 				mutex.Unlock()
 
 				fmt.Printf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
-				if !*dev {
-					insta.Follow(user.ID)
-					setFollowed(db, user.Username)
+				previoslyFollowed, _ := getFollowed(db, user.Username)
+				if previoslyFollowed != "" {
+					log.Printf("%s previously followed at %s, skipping\n", user.Username, previoslyFollowed)
+				} else {
+					if !*dev {
+						insta.Follow(user.ID)
+						setFollowed(db, user.Username)
+					}
+					followFollowersRes <- TelegramResponse{fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"]), msg}
+					time.Sleep(10 * time.Second)
 				}
-				followFollowersRes <- TelegramResponse{fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"]), msg}
-				time.Sleep(10 * time.Second)
 			}
 			followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", current), msg}
 		} else {
