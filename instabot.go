@@ -218,9 +218,10 @@ func main() {
 				} else if Command == "stats" {
 					unfollowCount, _ := getStats(db, "unfollow")
 					followCount, _ := getStats(db, "follow")
+					refollowCount, _ := getStats(db, "refollow")
 					likeCount, _ := getStats(db, "like")
 					commentCount, _ := getStats(db, "comment")
-					msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, likeCount, commentCount)
+					msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nRefollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, refollowCount, likeCount, commentCount)
 					bot.Send(msg)
 				} else if Text != "" {
 					msg.Text = Text
