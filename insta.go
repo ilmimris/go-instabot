@@ -79,8 +79,6 @@ func followFollowers(db *bolt.DB) {
 					continue
 				}
 				current++
-				incStats(db, "follow")
-				incStats(db, "refollow")
 
 				mutex.Lock()
 				if state["refollow_cancel"] > 0 {
@@ -107,6 +105,8 @@ func followFollowers(db *bolt.DB) {
 						if !*dev {
 							insta.Follow(user.ID)
 							setFollowed(db, user.Username)
+							incStats(db, "follow")
+							incStats(db, "refollow")
 						}
 						followFollowersRes <- TelegramResponse{fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"]), msg}
 						if !*dev {
@@ -169,7 +169,6 @@ func syncFollowers(db *bolt.DB) {
 					continue
 				}
 				current++
-				incStats(db, "unfollow")
 
 				mutex.Lock()
 				if state["unfollow_cancel"] > 0 {
@@ -204,6 +203,7 @@ func syncFollowers(db *bolt.DB) {
 				if !*dev {
 					insta.UnFollow(user.ID)
 					setFollowed(db, user.Username)
+					incStats(db, "unfollow")
 				}
 				unfollowRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"]), msg}
 				if !*dev {
