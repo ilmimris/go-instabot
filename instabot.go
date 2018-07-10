@@ -91,7 +91,7 @@ func main() {
 
 	c.AddFunc("0 0 10 * * *", func() { fmt.Println("Start follow"); startFollow(bot) })
 	c.AddFunc("0 0 18 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot) })
-	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot) })
+	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db) })
 
 	// read updated
 	for { //update := range updates {
@@ -170,7 +170,7 @@ func main() {
 					state["refollow_cancel"] = 1
 					mutex.Unlock()
 				} else if Command == "stats" {
-					sendStats(bot)
+					sendStats(bot, db)
 				} else if Text != "" {
 					msg.Text = Text
 					bot.Send(msg)
@@ -288,7 +288,7 @@ func startUnfollow(bot *tgbotapi.BotAPI) {
 	}
 }
 
-func sendStats(bot *tgbotapi.BotAPI) {
+func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	unfollowCount, _ := getStats(db, "unfollow")
 	followCount, _ := getStats(db, "follow")
