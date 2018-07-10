@@ -29,6 +29,8 @@ var (
 	editMessage = make(map[string]int)
 	mutex       = &sync.Mutex{}
 	UserID      int64
+
+	commandKeyboard tgbotapi.ReplyKeyboardMarkup
 )
 var db *bolt.DB
 
@@ -36,12 +38,6 @@ func main() {
 	state["follow"] = -1
 	state["unfollow"] = -1
 	state["refollow"] = -1
-
-	// Gets the command line options
-	parseOptions()
-
-	// Gets the config
-	getConfig()
 
 	UserID = viper.GetInt64("user.telegram.id")
 
@@ -152,7 +148,11 @@ func main() {
 					if state["follow"] >= 0 {
 						followProgress = fmt.Sprintf("%d%% [%d/%d]", state["follow"], state["follow_current"], state["follow_all_count"])
 					}
-					msg.Text = fmt.Sprintf("Unfollow — %s\nFollow — %s", unfollowProgress, followProgress)
+					var refollowProgress = "not started"
+					if state["refollow"] >= 0 {
+						refollowProgress = fmt.Sprintf("%d%% [%d/%d]", state["refollow"], state["refollow_current"], state["refollow_all_count"])
+					}
+					msg.Text = fmt.Sprintf("Unfollow — %s\nFollow — %s\nRefollow — %s", unfollowProgress, followProgress, refollowProgress)
 					msgRes, err := bot.Send(msg)
 					if err != nil {
 						editMessage["progress"] = msgRes.MessageID
@@ -173,6 +173,7 @@ func main() {
 					sendStats(bot, db)
 				} else if Text != "" {
 					msg.Text = Text
+					msg.ReplyMarkup = commandKeyboard
 					bot.Send(msg)
 				}
 			}
@@ -299,4 +300,28 @@ func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB) {
 		msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nRefollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, refollowCount, likeCount, commentCount)
 		bot.Send(msg)
 	}
+}
+
+func init() {
+	initKeyboard()
+	parseOptions()
+	getConfig()
+}
+
+func initKeyboard() {
+	commandKeyboard = tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("/stats"),
+			tgbotapi.NewKeyboardButton("/progress"),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("/follow"),
+			tgbotapi.NewKeyboardButton("/unfollow"),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("/cancelfollow"),
+			tgbotapi.NewKeyboardButton("/cancelunfollow"),
+			tgbotapi.NewKeyboardButton("/cancelrefollow"),
+		),
+	)
 }
