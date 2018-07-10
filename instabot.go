@@ -7,18 +7,18 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
+	"github.com/robfig/cron"
 	"github.com/spf13/viper"
 	"gopkg.in/telegram-bot-api.v4"
 )
 
 type TelegramResponse struct {
 	body string
-	m    tgbotapi.Message
 }
 
 var (
-	followReq          chan tgbotapi.Message
-	unfollowReq        chan tgbotapi.Message
+	followReq          chan string
+	unfollowReq        chan string
 	followFollowersReq chan tgbotapi.Message
 
 	followRes          chan TelegramResponse
@@ -28,6 +28,7 @@ var (
 	state       = make(map[string]int)
 	editMessage = make(map[string]int)
 	mutex       = &sync.Mutex{}
+	UserID      int64
 )
 var db *bolt.DB
 
@@ -42,20 +43,26 @@ func main() {
 	// Gets the config
 	getConfig()
 
+	UserID = viper.GetInt64("user.telegram.id")
+
 	db, err := initBolt()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
+	c := cron.New()
+	c.Start()
+	defer c.Stop()
+
 	go login()
 	// создаем канал
-	followReq = make(chan tgbotapi.Message, 2)
+	followReq = make(chan string, 2)
 	go loopTags(db)
 	followRes = make(chan TelegramResponse, 2)
 
 	// создаем канал
-	unfollowReq = make(chan tgbotapi.Message, 2)
+	unfollowReq = make(chan string, 2)
 	go syncFollowers(db)
 	unfollowRes = make(chan TelegramResponse, 2)
 
@@ -82,15 +89,15 @@ func main() {
 		log.Fatalf("[INIT] [Failed to init Telegram updates chan: %v]", err)
 	}
 
-	UserID := viper.GetInt64("user.telegram.id")
+	c.AddFunc("0 0 10 * * *", func() { fmt.Println("Start follow"); startFollow(bot) })
+	c.AddFunc("0 0 18 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot) })
 
-	// for update := range updates {
 	// read updated
 	for { //update := range updates {
 		select {
 		case update := <-updates:
 			// UserName := update.Message.From.UserName
-
+			log.Println(UserID)
 			if int64(update.Message.From.ID) == UserID {
 				// ChatID := update.Message.Chat.ID
 
@@ -132,63 +139,9 @@ func main() {
 						followFollowersReq <- *update.Message
 					}
 				} else if Command == "follow" {
-					state["follow_cancel"] = 0
-					if state["follow"] >= 0 {
-						msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
-						if editMessage["follow"] > 0 {
-							edit := tgbotapi.EditMessageTextConfig{
-								BaseEdit: tgbotapi.BaseEdit{
-									ChatID:    UserID,
-									MessageID: editMessage["follow"],
-								},
-								Text: msg.Text,
-							}
-							bot.Send(edit)
-						} else {
-							msgRes, err := bot.Send(msg)
-							if err == nil {
-								editMessage["follow"] = msgRes.MessageID
-							}
-						}
-					} else {
-						state["follow"] = 0
-						report = make(map[line]int)
-						msg.Text = "Starting follow"
-						msgRes, err := bot.Send(msg)
-						if err == nil {
-							editMessage["follow"] = msgRes.MessageID
-						}
-						followReq <- *update.Message
-					}
+					startFollow(bot)
 				} else if Command == "unfollow" {
-					state["unfollow_cancel"] = 0
-					if state["unfollow"] >= 0 {
-						msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
-						if editMessage["unfollow"] > 0 {
-							edit := tgbotapi.EditMessageTextConfig{
-								BaseEdit: tgbotapi.BaseEdit{
-									ChatID:    UserID,
-									MessageID: editMessage["unfollow"],
-								},
-								Text: msg.Text,
-							}
-							bot.Send(edit)
-						} else {
-							msgRes, err := bot.Send(msg)
-							if err == nil {
-								log.Print(msgRes, msgRes.MessageID)
-								editMessage["unfollow"] = msgRes.MessageID
-							}
-						}
-					} else {
-						state["unfollow"] = 0
-						msg.Text = "Starting unfollow"
-						msgRes, err := bot.Send(msg)
-						if err == nil {
-							editMessage["unfollow"] = msgRes.MessageID
-						}
-						unfollowReq <- *update.Message
-					}
+					startUnfollow(bot)
 				} else if Command == "progress" {
 					var unfollowProgress = "not started"
 					if state["unfollow"] >= 0 {
@@ -240,7 +193,6 @@ func main() {
 				bot.Send(edit)
 			} else {
 				msg := tgbotapi.NewMessage(UserID, resp.body)
-				msg.ReplyToMessageID = resp.m.MessageID
 				bot.Send(msg)
 			}
 		case resp := <-unfollowRes:
@@ -255,7 +207,6 @@ func main() {
 				bot.Send(edit)
 			} else {
 				msg := tgbotapi.NewMessage(UserID, resp.body)
-				msg.ReplyToMessageID = resp.m.MessageID
 				bot.Send(msg)
 			}
 		case resp := <-followFollowersRes:
@@ -270,9 +221,74 @@ func main() {
 				bot.Send(edit)
 			} else {
 				msg := tgbotapi.NewMessage(UserID, resp.body)
-				msg.ReplyToMessageID = resp.m.MessageID
 				bot.Send(msg)
 			}
 		}
+	}
+}
+
+func startFollow(bot *tgbotapi.BotAPI) {
+	msg := tgbotapi.NewMessage(UserID, "")
+	state["follow_cancel"] = 0
+	if state["follow"] >= 0 {
+		msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
+		if editMessage["follow"] > 0 {
+			edit := tgbotapi.EditMessageTextConfig{
+				BaseEdit: tgbotapi.BaseEdit{
+					ChatID:    UserID,
+					MessageID: editMessage["follow"],
+				},
+				Text: msg.Text,
+			}
+			bot.Send(edit)
+		} else {
+			msgRes, err := bot.Send(msg)
+			if err == nil {
+				editMessage["follow"] = msgRes.MessageID
+			}
+		}
+	} else {
+		state["follow"] = 0
+		report = make(map[line]int)
+		msg.Text = "Starting follow"
+		msgRes, err := bot.Send(msg)
+		if err == nil {
+			editMessage["follow"] = msgRes.MessageID
+		}
+		followReq <- "Starting follow"
+	}
+}
+
+func startUnfollow(bot *tgbotapi.BotAPI) {
+	msg := tgbotapi.NewMessage(UserID, "")
+	state["unfollow_cancel"] = 0
+	if state["unfollow"] >= 0 {
+		msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
+		if editMessage["unfollow"] > 0 {
+			edit := tgbotapi.EditMessageTextConfig{
+				BaseEdit: tgbotapi.BaseEdit{
+					ChatID:    UserID,
+					MessageID: editMessage["unfollow"],
+				},
+				Text: msg.Text,
+			}
+			bot.Send(edit)
+		} else {
+			msgRes, err := bot.Send(msg)
+			if err == nil {
+				log.Print(msgRes, msgRes.MessageID)
+				editMessage["unfollow"] = msgRes.MessageID
+			}
+		}
+	} else {
+		state["unfollow"] = 0
+		msg.Text = "Starting unfollow"
+		fmt.Println(msg.Text)
+		msgRes, err := bot.Send(msg)
+		if err == nil {
+			editMessage["unfollow"] = msgRes.MessageID
+		}
+
+		unfollowReq <- msg.Text
 	}
 }

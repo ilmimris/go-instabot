@@ -44,7 +44,7 @@ func followFollowers(db *bolt.DB) {
 			userFriendShip, err := insta.UserFriendShip(user.User.ID)
 			check(err)
 			if !userFriendShip.Following {
-				followFollowersRes <- TelegramResponse{"User profile is private and we are not following, can't process", msg}
+				followFollowersRes <- TelegramResponse{"User profile is private and we are not following, can't process"}
 			}
 		}
 
@@ -72,7 +72,7 @@ func followFollowers(db *bolt.DB) {
 			var current = 0
 
 			fmt.Printf("\n%d followers!\n", allCount)
-			followFollowersRes <- TelegramResponse{fmt.Sprintf("%d will be followed", allCount), msg}
+			followFollowersRes <- TelegramResponse{fmt.Sprintf("%d will be followed", allCount)}
 
 			for _, user := range users {
 				if current >= limit {
@@ -83,7 +83,7 @@ func followFollowers(db *bolt.DB) {
 				if state["refollow_cancel"] > 0 {
 					state["refollow_cancel"] = 0
 					mutex.Unlock()
-					followFollowersRes <- TelegramResponse{"refollowwing canceled", msg}
+					followFollowersRes <- TelegramResponse{"refollowwing canceled"}
 					break
 				}
 
@@ -105,7 +105,7 @@ func followFollowers(db *bolt.DB) {
 							incStats(db, "follow")
 							incStats(db, "refollow")
 						}
-						followFollowersRes <- TelegramResponse{fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"]), msg}
+						followFollowersRes <- TelegramResponse{fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])}
 						if !*dev {
 							time.Sleep(10 * time.Second)
 						} else {
@@ -116,19 +116,21 @@ func followFollowers(db *bolt.DB) {
 
 				mutex.Unlock()
 			}
-			followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", current), msg}
+			followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", current)}
 		} else {
-			followFollowersRes <- TelegramResponse{"followers not found :(", msg}
+			followFollowersRes <- TelegramResponse{"followers not found :("}
 			fmt.Println("followers not found :(")
 		}
 		mutex.Lock()
 		state["refollow"] = -1
+		editMessage["refollow"] = -1
 		mutex.Unlock()
 	}
 }
 
 func syncFollowers(db *bolt.DB) {
 	for msg := range unfollowReq {
+		log.Println(msg)
 		following, err := insta.SelfTotalUserFollowing()
 		check(err)
 		followers, err := insta.SelfTotalUserFollowers()
@@ -161,7 +163,7 @@ func syncFollowers(db *bolt.DB) {
 			var current = 0
 
 			fmt.Printf("\n%d users are not following you back!\n", allCount)
-			unfollowRes <- TelegramResponse{fmt.Sprintf("%d will be unfollowed", allCount), msg}
+			unfollowRes <- TelegramResponse{fmt.Sprintf("%d will be unfollowed", allCount)}
 
 			for _, user := range users {
 				if current >= limit {
@@ -172,7 +174,7 @@ func syncFollowers(db *bolt.DB) {
 				if state["unfollow_cancel"] > 0 {
 					state["unfollow_cancel"] = 0
 					mutex.Unlock()
-					unfollowRes <- TelegramResponse{"Unfollowing canceled", msg}
+					unfollowRes <- TelegramResponse{"Unfollowing canceled"}
 					break
 				}
 
@@ -206,7 +208,7 @@ func syncFollowers(db *bolt.DB) {
 					setFollowed(db, user.Username)
 					incStats(db, "unfollow")
 				}
-				unfollowRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"]), msg}
+				unfollowRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])}
 				if !*dev {
 					time.Sleep(10 * time.Second)
 				} else {
@@ -216,9 +218,10 @@ func syncFollowers(db *bolt.DB) {
 
 			mutex.Lock()
 			state["unfollow"] = -1
+			editMessage["unfollow"] = -1
 			mutex.Unlock()
 
-			unfollowRes <- TelegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", current), msg}
+			unfollowRes <- TelegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", current)}
 		}
 	}
 }
@@ -296,6 +299,7 @@ func loopTags(db *bolt.DB) {
 	tagFeed = make(map[string]response.TagFeedsResponse)
 
 	for msg := range followReq {
+		log.Println(msg)
 		var allCount = len(tagsList)
 		if allCount > 0 {
 			var current = 0
@@ -306,8 +310,9 @@ func loopTags(db *bolt.DB) {
 				if state["follow_cancel"] > 0 {
 					state["follow_cancel"] = 0
 					state["follow"] = -1
+					editMessage["follow"] = -1
 					mutex.Unlock()
-					followRes <- TelegramResponse{"Following canceled", msg}
+					followRes <- TelegramResponse{"Following canceled"}
 					return
 				}
 
@@ -331,12 +336,13 @@ func loopTags(db *bolt.DB) {
 
 				fmt.Printf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
 				browse(db)
-				followRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"]), msg}
+				followRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])}
 			}
-			followRes <- TelegramResponse{"Finished", msg}
+			followRes <- TelegramResponse{"Finished"}
 		}
 		mutex.Lock()
 		state["follow"] = -1
+		editMessage["follow"] = -1
 		mutex.Unlock()
 
 		reportAsString := ""
@@ -352,7 +358,7 @@ func loopTags(db *bolt.DB) {
 		fmt.Println(reportAsString)
 
 		// Sends the report to the email in the config file, if the option is enabled
-		followRes <- TelegramResponse{reportAsString, msg}
+		followRes <- TelegramResponse{reportAsString}
 	}
 }
 
