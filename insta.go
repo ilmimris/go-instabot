@@ -51,6 +51,11 @@ func followFollowers(db *bolt.DB) {
 		followers, err := insta.TotalUserFollowers(user.User.ID)
 		//log.Println(followers)
 		check(err)
+		var users = followers.Users
+		if len(users) > 0 {
+			rand.Seed(time.Now().UnixNano()) // do it once during app initialization
+			Shuffle(users)
+		}
 
 		var limit = viper.GetInt("limits.maxSync")
 		if limit <= 0 || limit >= 1000 {
@@ -62,14 +67,14 @@ func followFollowers(db *bolt.DB) {
 			limit = limit - today
 		}
 
-		var allCount = int(math.Min(float64(len(followers.Users)), float64(limit)))
+		var allCount = int(math.Min(float64(len(users)), float64(limit)))
 		if allCount > 0 {
 			var current = 0
 
 			fmt.Printf("\n%d followers!\n", allCount)
 			followFollowersRes <- TelegramResponse{fmt.Sprintf("%d will be followed", allCount), msg}
 
-			for _, user := range followers.Users {
+			for _, user := range users {
 				if current >= limit {
 					continue
 				}
