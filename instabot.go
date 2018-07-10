@@ -91,6 +91,7 @@ func main() {
 
 	c.AddFunc("0 0 10 * * *", func() { fmt.Println("Start follow"); startFollow(bot) })
 	c.AddFunc("0 0 18 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot) })
+	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot) })
 
 	// read updated
 	for { //update := range updates {
@@ -169,13 +170,7 @@ func main() {
 					state["refollow_cancel"] = 1
 					mutex.Unlock()
 				} else if Command == "stats" {
-					unfollowCount, _ := getStats(db, "unfollow")
-					followCount, _ := getStats(db, "follow")
-					refollowCount, _ := getStats(db, "refollow")
-					likeCount, _ := getStats(db, "like")
-					commentCount, _ := getStats(db, "comment")
-					msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nRefollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, refollowCount, likeCount, commentCount)
-					bot.Send(msg)
+					sendStats(bot)
 				} else if Text != "" {
 					msg.Text = Text
 					bot.Send(msg)
@@ -290,5 +285,18 @@ func startUnfollow(bot *tgbotapi.BotAPI) {
 		}
 
 		unfollowReq <- msg.Text
+	}
+}
+
+func sendStats(bot *tgbotapi.BotAPI) {
+	msg := tgbotapi.NewMessage(UserID, "")
+	unfollowCount, _ := getStats(db, "unfollow")
+	followCount, _ := getStats(db, "follow")
+	refollowCount, _ := getStats(db, "refollow")
+	likeCount, _ := getStats(db, "like")
+	commentCount, _ := getStats(db, "comment")
+	if unfollowCount > 0 || followCount > 0 || refollowCount > 0 || likeCount > 0 || commentCount > 0 {
+		msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nRefollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, refollowCount, likeCount, commentCount)
+		bot.Send(msg)
 	}
 }
