@@ -186,7 +186,7 @@ func Shuffle(slice interface{}) {
 
 func GetKeys(slice interface{}) []string {
 	keys := reflect.ValueOf(slice).MapKeys()
-	log.Println(keys)
+	// log.Println(keys)
 	strkeys := make([]string, len(keys))
 	for i := 0; i < len(keys); i++ {
 		strkeys[i] = keys[i].String()
