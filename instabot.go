@@ -185,9 +185,13 @@ func main() {
 				} else if Command == "stats" {
 					sendStats(bot, db)
 				} else if Command == "getcomments" {
-					sendComments(bot, db)
+					sendComments(bot)
+				} else if Command == "updatecomments" {
+					updateComments(bot, Args)
 				} else if Command == "gettags" {
-					sendTags(bot, db)
+					sendTags(bot)
+				} else if Command == "updatetags" {
+					updateTags(bot, Args)
 				} else if Text != "" {
 					msg.Text = Text
 					msg.ReplyMarkup = commandKeyboard
@@ -319,7 +323,7 @@ func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB) {
 	}
 }
 
-func sendComments(bot *tgbotapi.BotAPI, db *bolt.DB) {
+func sendComments(bot *tgbotapi.BotAPI) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	if len(commentsList) > 0 {
 		msg.Text = strings.Join(commentsList, ", ")
@@ -331,11 +335,59 @@ func sendComments(bot *tgbotapi.BotAPI, db *bolt.DB) {
 	bot.Send(msg)
 }
 
-func sendTags(bot *tgbotapi.BotAPI, db *bolt.DB) {
+func updateComments(bot *tgbotapi.BotAPI, comments string) {
+	msg := tgbotapi.NewMessage(UserID, "")
+	if len(comments) > 0 {
+		newComments := strings.Split(comments, ", ")
+		viper.Set("comments", newComments)
+		viper.WriteConfigAs("test.json")
+
+		msg.Text = "Comments updated"
+	} else {
+		msg.Text = "Comments is empty"
+	}
+
+	bot.Send(msg)
+}
+
+func sendTags(bot *tgbotapi.BotAPI) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	if len(tagsList) > 0 {
 		keys := GetKeys(tagsList)
 		msg.Text = strings.Join(keys, ", ")
+	} else {
+		msg.Text = "Tags is empty"
+	}
+
+	bot.Send(msg)
+}
+
+func updateTags(bot *tgbotapi.BotAPI, tags string) {
+	msg := tgbotapi.NewMessage(UserID, "")
+	if len(tags) > 0 {
+		// newTags := strings.Split(tags, ", ")
+		for _, tag := range strings.Split(tags, ", ") {
+			key := "tags." + tag
+			like := 20
+			if viper.IsSet(key + ".like") {
+				like = viper.GetInt(key + ".like")
+			}
+			viper.Set(key+".like", like)
+
+			comment := 2
+			if viper.IsSet(key + ".comment") {
+				comment = viper.GetInt(key + ".comment")
+			}
+			viper.Set(key+".comment", comment)
+
+			follow := 10
+			if viper.IsSet(key + ".follow") {
+				follow = viper.GetInt(key + ".follow")
+			}
+			viper.Set(key+".follow", follow)
+		}
+		viper.WriteConfig()
+		msg.Text = "Tags updated"
 	} else {
 		msg.Text = "Tags is empty"
 	}
