@@ -69,7 +69,13 @@ func followFollowers(db *bolt.DB) {
 			}
 
 			var allCount = int(math.Min(float64(len(users)), float64(limit)))
-			if allCount > 0 {
+			if allCount == 0 && len(users) > 0 {
+				followFollowersRes <- TelegramResponse{"Follow limit reached :("}
+				fmt.Println("Follow limit reached :(")
+			} else if allCount <= 0 {
+				followFollowersRes <- TelegramResponse{"Followers not found :("}
+				fmt.Println("Followers not found :(")
+			} else {
 				var current = 0
 
 				fmt.Printf("\n%d followers!\n", allCount)
@@ -118,9 +124,6 @@ func followFollowers(db *bolt.DB) {
 					mutex.Unlock()
 				}
 				followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", current)}
-			} else {
-				followFollowersRes <- TelegramResponse{"followers not found :("}
-				fmt.Println("followers not found :(")
 			}
 			mutex.Lock()
 			state["refollow"] = -1
