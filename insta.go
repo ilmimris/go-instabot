@@ -127,7 +127,7 @@ func followFollowers(db *bolt.DB) {
 			}
 			mutex.Lock()
 			state["refollow"] = -1
-			editMessage["refollow"] = -1
+			editMessage["refollow"] = make(map[int]int)
 			mutex.Unlock()
 		}
 	}
@@ -224,7 +224,7 @@ func syncFollowers(db *bolt.DB) {
 
 			mutex.Lock()
 			state["unfollow"] = -1
-			editMessage["unfollow"] = -1
+			editMessage["unfollow"] = make(map[int]int)
 			mutex.Unlock()
 
 			unfollowRes <- TelegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", current)}
@@ -317,7 +317,7 @@ func loopTags(db *bolt.DB) {
 				if state["follow_cancel"] > 0 {
 					state["follow_cancel"] = 0
 					state["follow"] = -1
-					editMessage["follow"] = -1
+					editMessage["follow"] = make(map[int]int)
 					mutex.Unlock()
 					followRes <- TelegramResponse{"Following canceled"}
 					return
@@ -349,7 +349,7 @@ func loopTags(db *bolt.DB) {
 		}
 		mutex.Lock()
 		state["follow"] = -1
-		editMessage["follow"] = -1
+		editMessage["follow"] = make(map[int]int)
 		mutex.Unlock()
 
 		reportAsString := ""

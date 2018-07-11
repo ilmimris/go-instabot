@@ -28,10 +28,11 @@ var (
 	followFollowersRes chan TelegramResponse
 
 	state       = make(map[string]int)
-	editMessage = make(map[string]int)
+	editMessage = make(map[string]map[int]int)
 	mutex       = &sync.Mutex{}
 
-	UserID        int64
+	reportID      int64
+	admins        []string
 	telegramToken string
 	instaUsername string
 	instaPassword string
@@ -44,6 +45,10 @@ func main() {
 	state["follow"] = -1
 	state["unfollow"] = -1
 	state["refollow"] = -1
+
+	editMessage["follow"] = make(map[int]int)
+	editMessage["unfollow"] = make(map[int]int)
+	editMessage["refollow"] = make(map[int]int)
 
 	db, err := initBolt()
 	if err != nil {
@@ -89,9 +94,9 @@ func main() {
 		log.Fatalf("[INIT] [Failed to init Telegram updates chan: %v]", err)
 	}
 
-	c.AddFunc("0 0 8 * * *", func() { fmt.Println("Start follow"); startFollow(bot) })
-	c.AddFunc("0 0 20 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot) })
-	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db) })
+	c.AddFunc("0 0 8 * * *", func() { fmt.Println("Start follow"); startFollow(bot, reportID) })
+	c.AddFunc("0 0 20 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot, reportID) })
+	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db, reportID) })
 
 	for _, task := range c.Entries() {
 		log.Println(task.Next)
@@ -103,7 +108,7 @@ func main() {
 		case update := <-updates:
 			// UserName := update.Message.From.UserName
 			// log.Println(UserID)
-			if int64(update.Message.From.ID) == UserID {
+			if intInStringSlice(int(update.Message.From.ID), admins) {
 				// ChatID := update.Message.Chat.ID
 
 				Text := update.Message.Text
@@ -112,7 +117,7 @@ func main() {
 
 				// log.Printf("[%d] %s, %s, %s", UserID, Text, Command, Args)
 
-				msg := tgbotapi.NewMessage(UserID, "")
+				msg := tgbotapi.NewMessage(int64(update.Message.From.ID), "")
 
 				if Command == "refollow" {
 					if Args == "" {
@@ -122,11 +127,11 @@ func main() {
 						state["refollow_cancel"] = 0
 						if state["refollow"] >= 0 {
 							msg.Text = fmt.Sprintf("Refollow in progress (%d%%)", state["refollow"])
-							if editMessage["refollow"] > 0 {
+							if editMessage["refollow"][update.Message.From.ID] > 0 {
 								edit := tgbotapi.EditMessageTextConfig{
 									BaseEdit: tgbotapi.BaseEdit{
-										ChatID:    UserID,
-										MessageID: editMessage["refollow"],
+										ChatID:    int64(update.Message.From.ID),
+										MessageID: editMessage["refollow"][update.Message.From.ID],
 									},
 									Text: msg.Text,
 								}
@@ -134,7 +139,7 @@ func main() {
 							} else {
 								msgRes, err := bot.Send(msg)
 								if err == nil {
-									editMessage["refollow"] = msgRes.MessageID
+									editMessage["refollow"][update.Message.From.ID] = msgRes.MessageID
 								}
 							}
 						} else {
@@ -143,15 +148,15 @@ func main() {
 							msg.Text = "Starting refollow"
 							msgRes, err := bot.Send(msg)
 							if err == nil {
-								editMessage["refollow"] = msgRes.MessageID
+								editMessage["refollow"][update.Message.From.ID] = msgRes.MessageID
 							}
 							followFollowersReq <- *update.Message
 						}
 					}
 				} else if Command == "follow" {
-					startFollow(bot)
+					startFollow(bot, int64(update.Message.From.ID))
 				} else if Command == "unfollow" {
-					startUnfollow(bot)
+					startUnfollow(bot, int64(update.Message.From.ID))
 				} else if Command == "progress" {
 					var unfollowProgress = "not started"
 					if state["unfollow"] >= 0 {
@@ -168,7 +173,7 @@ func main() {
 					msg.Text = fmt.Sprintf("Unfollow — %s\nFollow — %s\nRefollow — %s", unfollowProgress, followProgress, refollowProgress)
 					msgRes, err := bot.Send(msg)
 					if err != nil {
-						editMessage["progress"] = msgRes.MessageID
+						editMessage["progress"][update.Message.From.ID] = msgRes.MessageID
 					}
 				} else if Command == "cancelfollow" {
 					mutex.Lock()
@@ -183,15 +188,15 @@ func main() {
 					state["refollow_cancel"] = 1
 					mutex.Unlock()
 				} else if Command == "stats" {
-					sendStats(bot, db)
+					sendStats(bot, db, int64(update.Message.From.ID))
 				} else if Command == "getcomments" {
-					sendComments(bot)
+					sendComments(bot, int64(update.Message.From.ID))
 				} else if Command == "updatecomments" {
-					updateComments(bot, Args)
+					updateComments(bot, Args, int64(update.Message.From.ID))
 				} else if Command == "gettags" {
-					sendTags(bot)
+					sendTags(bot, int64(update.Message.From.ID))
 				} else if Command == "updatetags" {
-					updateTags(bot, Args)
+					updateTags(bot, Args, int64(update.Message.From.ID))
 				} else if Text != "" {
 					msg.Text = Text
 					msg.ReplyMarkup = commandKeyboard
@@ -199,69 +204,77 @@ func main() {
 				}
 			}
 		case resp := <-followRes:
-			if editMessage["follow"] > 0 {
-				edit := tgbotapi.EditMessageTextConfig{
-					BaseEdit: tgbotapi.BaseEdit{
-						ChatID:    UserID,
-						MessageID: editMessage["follow"],
-					},
-					Text: resp.body,
+			if len(editMessage["follow"]) > 0 {
+				for _, msg := range editMessage["follow"] {
+					edit := tgbotapi.EditMessageTextConfig{
+						BaseEdit: tgbotapi.BaseEdit{
+							ChatID:    int64(msg),
+							MessageID: editMessage["follow"][msg],
+						},
+						Text: resp.body,
+					}
+					bot.Send(edit)
 				}
-				bot.Send(edit)
 			} else {
-				msg := tgbotapi.NewMessage(UserID, resp.body)
+				msg := tgbotapi.NewMessage(reportID, resp.body)
 				bot.Send(msg)
 			}
 		case resp := <-unfollowRes:
-			if editMessage["unfollow"] > 0 {
-				edit := tgbotapi.EditMessageTextConfig{
-					BaseEdit: tgbotapi.BaseEdit{
-						ChatID:    UserID,
-						MessageID: editMessage["unfollow"],
-					},
-					Text: resp.body,
+			if len(editMessage["unfollow"]) > 0 {
+				for _, msg := range editMessage["unfollow"] {
+					edit := tgbotapi.EditMessageTextConfig{
+						BaseEdit: tgbotapi.BaseEdit{
+							ChatID:    int64(msg),
+							MessageID: editMessage["unfollow"][msg],
+						},
+						Text: resp.body,
+					}
+					bot.Send(edit)
 				}
-				bot.Send(edit)
 			} else {
-				msg := tgbotapi.NewMessage(UserID, resp.body)
+				msg := tgbotapi.NewMessage(reportID, resp.body)
 				bot.Send(msg)
 			}
 		case resp := <-followFollowersRes:
-			if editMessage["refollow"] > 0 {
-				edit := tgbotapi.EditMessageTextConfig{
-					BaseEdit: tgbotapi.BaseEdit{
-						ChatID:    UserID,
-						MessageID: editMessage["refollow"],
-					},
-					Text: resp.body,
+			if len(editMessage["refollow"]) > 0 {
+				for _, msg := range editMessage["refollow"] {
+					edit := tgbotapi.EditMessageTextConfig{
+						BaseEdit: tgbotapi.BaseEdit{
+							ChatID:    int64(msg),
+							MessageID: editMessage["refollow"][msg],
+						},
+						Text: resp.body,
+					}
+					bot.Send(edit)
 				}
-				bot.Send(edit)
 			} else {
-				msg := tgbotapi.NewMessage(UserID, resp.body)
+				msg := tgbotapi.NewMessage(reportID, resp.body)
 				bot.Send(msg)
 			}
 		}
 	}
 }
 
-func startFollow(bot *tgbotapi.BotAPI) {
+func startFollow(bot *tgbotapi.BotAPI, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	state["follow_cancel"] = 0
 	if state["follow"] >= 0 {
 		msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
-		if editMessage["follow"] > 0 {
-			edit := tgbotapi.EditMessageTextConfig{
-				BaseEdit: tgbotapi.BaseEdit{
-					ChatID:    UserID,
-					MessageID: editMessage["follow"],
-				},
-				Text: msg.Text,
+		if len(editMessage["follow"]) > 0 {
+			for UserID, EditID := range editMessage["follow"] {
+				edit := tgbotapi.EditMessageTextConfig{
+					BaseEdit: tgbotapi.BaseEdit{
+						ChatID:    int64(UserID),
+						MessageID: EditID,
+					},
+					Text: msg.Text,
+				}
+				bot.Send(edit)
 			}
-			bot.Send(edit)
 		} else {
 			msgRes, err := bot.Send(msg)
 			if err == nil {
-				editMessage["follow"] = msgRes.MessageID
+				editMessage["follow"][int(UserID)] = msgRes.MessageID
 			}
 		}
 	} else {
@@ -270,31 +283,33 @@ func startFollow(bot *tgbotapi.BotAPI) {
 		msg.Text = "Starting follow"
 		msgRes, err := bot.Send(msg)
 		if err == nil {
-			editMessage["follow"] = msgRes.MessageID
+			editMessage["follow"][int(UserID)] = msgRes.MessageID
 		}
 		followReq <- "Starting follow"
 	}
 }
 
-func startUnfollow(bot *tgbotapi.BotAPI) {
+func startUnfollow(bot *tgbotapi.BotAPI, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	state["unfollow_cancel"] = 0
 	if state["unfollow"] >= 0 {
 		msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
-		if editMessage["unfollow"] > 0 {
-			edit := tgbotapi.EditMessageTextConfig{
-				BaseEdit: tgbotapi.BaseEdit{
-					ChatID:    UserID,
-					MessageID: editMessage["unfollow"],
-				},
-				Text: msg.Text,
+		if len(editMessage["unfollow"]) > 0 {
+			for UserID, EditID := range editMessage["unfollow"] {
+				edit := tgbotapi.EditMessageTextConfig{
+					BaseEdit: tgbotapi.BaseEdit{
+						ChatID:    int64(UserID),
+						MessageID: EditID,
+					},
+					Text: msg.Text,
+				}
+				bot.Send(edit)
 			}
-			bot.Send(edit)
 		} else {
 			msgRes, err := bot.Send(msg)
 			if err == nil {
 				log.Print(msgRes, msgRes.MessageID)
-				editMessage["unfollow"] = msgRes.MessageID
+				editMessage["unfollow"][int(UserID)] = msgRes.MessageID
 			}
 		}
 	} else {
@@ -303,14 +318,14 @@ func startUnfollow(bot *tgbotapi.BotAPI) {
 		fmt.Println(msg.Text)
 		msgRes, err := bot.Send(msg)
 		if err == nil {
-			editMessage["unfollow"] = msgRes.MessageID
+			editMessage["unfollow"][int(UserID)] = msgRes.MessageID
 		}
 
 		unfollowReq <- msg.Text
 	}
 }
 
-func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB) {
+func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	unfollowCount, _ := getStats(db, "unfollow")
 	followCount, _ := getStats(db, "follow")
@@ -323,7 +338,7 @@ func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB) {
 	}
 }
 
-func sendComments(bot *tgbotapi.BotAPI) {
+func sendComments(bot *tgbotapi.BotAPI, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	if len(commentsList) > 0 {
 		msg.Text = strings.Join(commentsList, ", ")
@@ -334,7 +349,7 @@ func sendComments(bot *tgbotapi.BotAPI) {
 	bot.Send(msg)
 }
 
-func updateComments(bot *tgbotapi.BotAPI, comments string) {
+func updateComments(bot *tgbotapi.BotAPI, comments string, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	if len(comments) > 0 {
 		newComments := strings.Split(comments, ", ")
@@ -348,7 +363,7 @@ func updateComments(bot *tgbotapi.BotAPI, comments string) {
 	bot.Send(msg)
 }
 
-func sendTags(bot *tgbotapi.BotAPI) {
+func sendTags(bot *tgbotapi.BotAPI, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	if len(tagsList) > 0 {
 		keys := GetKeys(tagsList)
@@ -360,7 +375,7 @@ func sendTags(bot *tgbotapi.BotAPI) {
 	bot.Send(msg)
 }
 
-func updateTags(bot *tgbotapi.BotAPI, tags string) {
+func updateTags(bot *tgbotapi.BotAPI, tags string, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	if len(tags) > 0 {
 		for _, tag := range strings.Split(tags, ", ") {

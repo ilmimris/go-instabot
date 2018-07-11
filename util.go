@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -114,7 +115,8 @@ func getConfig() {
 
 	commentsList = viper.GetStringSlice("comments")
 
-	UserID = viper.GetInt64("user.telegram.id")
+	reportID = viper.GetInt64("user.telegram.reportID")
+	admins = viper.GetStringSlice("user.telegram.admins")
 
 	telegramToken = viper.GetString("user.telegram.token")
 	instaUsername = viper.GetString("user.instagram.username")
@@ -193,4 +195,14 @@ func GetKeys(slice interface{}) []string {
 	}
 
 	return strkeys
+}
+
+func intInStringSlice(a int, list []string) bool {
+	b := strconv.Itoa(a)
+	for _, c := range list {
+		if b == c {
+			return true
+		}
+	}
+	return false
 }

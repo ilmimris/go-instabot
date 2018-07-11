@@ -5,7 +5,11 @@
             "password": "fooBAR"
         },
         "telegram": {
-            "id": 123,
+            "admins": [
+                123,
+                321
+            ],
+            "reportID": 123,
             "token": ".....:......._....."
         }
     },
