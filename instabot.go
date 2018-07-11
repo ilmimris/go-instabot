@@ -327,7 +327,6 @@ func sendComments(bot *tgbotapi.BotAPI) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	if len(commentsList) > 0 {
 		msg.Text = strings.Join(commentsList, ", ")
-
 	} else {
 		msg.Text = "Comments is empty"
 	}
@@ -340,8 +339,7 @@ func updateComments(bot *tgbotapi.BotAPI, comments string) {
 	if len(comments) > 0 {
 		newComments := strings.Split(comments, ", ")
 		viper.Set("comments", newComments)
-		viper.WriteConfigAs("test.json")
-
+		viper.WriteConfig()
 		msg.Text = "Comments updated"
 	} else {
 		msg.Text = "Comments is empty"
@@ -365,7 +363,6 @@ func sendTags(bot *tgbotapi.BotAPI) {
 func updateTags(bot *tgbotapi.BotAPI, tags string) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	if len(tags) > 0 {
-		// newTags := strings.Split(tags, ", ")
 		for _, tag := range strings.Split(tags, ", ") {
 			key := "tags." + tag
 			like := 20
