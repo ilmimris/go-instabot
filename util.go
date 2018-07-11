@@ -114,6 +114,12 @@ func getConfig() {
 
 	commentsList = viper.GetStringSlice("comments")
 
+	UserID = viper.GetInt64("user.telegram.id")
+
+	telegramToken = viper.GetString("user.telegram.token")
+	instaUsername = viper.GetString("user.instagram.username")
+	instaPassword = viper.GetString("user.instagram.password")
+
 	type Report struct {
 		Tag, Action string
 	}

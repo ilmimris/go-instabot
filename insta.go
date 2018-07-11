@@ -250,7 +250,7 @@ func contains(slice []response.User, user response.User) bool {
 
 // Logins and saves the session
 func createAndSaveSession() {
-	insta = goinsta.New(viper.GetString("user.instagram.username"), viper.GetString("user.instagram.password"))
+	insta = goinsta.New(instaUsername, instaPassword)
 	err := insta.Login()
 	check(err)
 
@@ -423,7 +423,7 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 		}
 
 		// Skip our own images
-		if image.User.Username == viper.GetString("user.instagram.username") {
+		if image.User.Username == instaUsername {
 			continue
 		}
 

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
+	"github.com/fsnotify/fsnotify"
 	"github.com/robfig/cron"
 	"github.com/spf13/viper"
 	"gopkg.in/telegram-bot-api.v4"
@@ -29,7 +30,11 @@ var (
 	state       = make(map[string]int)
 	editMessage = make(map[string]int)
 	mutex       = &sync.Mutex{}
-	UserID      int64
+
+	UserID        int64
+	telegramToken string
+	instaUsername string
+	instaPassword string
 
 	commandKeyboard tgbotapi.ReplyKeyboardMarkup
 )
@@ -39,8 +44,6 @@ func main() {
 	state["follow"] = -1
 	state["unfollow"] = -1
 	state["refollow"] = -1
-
-	UserID = viper.GetInt64("user.telegram.id")
 
 	db, err := initBolt()
 	if err != nil {
@@ -68,7 +71,7 @@ func main() {
 	go followFollowers(db)
 	followFollowersRes = make(chan TelegramResponse, 2)
 
-	bot, err := tgbotapi.NewBotAPI(viper.GetString("user.telegram.token"))
+	bot, err := tgbotapi.NewBotAPI(telegramToken)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -344,6 +347,12 @@ func init() {
 	initKeyboard()
 	parseOptions()
 	getConfig()
+
+	viper.WatchConfig()
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		fmt.Println("Config file changed:", e.Name)
+		getConfig()
+	})
 }
 
 func initKeyboard() {
