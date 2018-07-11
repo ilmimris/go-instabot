@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"sync"
 
@@ -85,8 +86,8 @@ func main() {
 		log.Fatalf("[INIT] [Failed to init Telegram updates chan: %v]", err)
 	}
 
-	c.AddFunc("0 0 10 * * *", func() { fmt.Println("Start follow"); startFollow(bot) })
-	c.AddFunc("0 0 18 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot) })
+	c.AddFunc("0 0 8 * * *", func() { fmt.Println("Start follow"); startFollow(bot) })
+	c.AddFunc("0 0 20 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot) })
 	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db) })
 
 	for _, task := range c.Entries() {
@@ -180,6 +181,10 @@ func main() {
 					mutex.Unlock()
 				} else if Command == "stats" {
 					sendStats(bot, db)
+				} else if Command == "getcomments" {
+					sendComments(bot, db)
+				} else if Command == "gettags" {
+					sendTags(bot, db)
 				} else if Text != "" {
 					msg.Text = Text
 					msg.ReplyMarkup = commandKeyboard
@@ -311,6 +316,30 @@ func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB) {
 	}
 }
 
+func sendComments(bot *tgbotapi.BotAPI, db *bolt.DB) {
+	msg := tgbotapi.NewMessage(UserID, "")
+	if len(commentsList) > 0 {
+		msg.Text = strings.Join(commentsList, ", ")
+
+	} else {
+		msg.Text = "Comments is empty"
+	}
+
+	bot.Send(msg)
+}
+
+func sendTags(bot *tgbotapi.BotAPI, db *bolt.DB) {
+	msg := tgbotapi.NewMessage(UserID, "")
+	if len(tagsList) > 0 {
+		keys := GetKeys(tagsList)
+		msg.Text = strings.Join(keys, ", ")
+	} else {
+		msg.Text = "Tags is empty"
+	}
+
+	bot.Send(msg)
+}
+
 func init() {
 	initKeyboard()
 	parseOptions()
@@ -331,6 +360,10 @@ func initKeyboard() {
 			tgbotapi.NewKeyboardButton("/cancelfollow"),
 			tgbotapi.NewKeyboardButton("/cancelunfollow"),
 			tgbotapi.NewKeyboardButton("/cancelrefollow"),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("/getcomments"),
+			tgbotapi.NewKeyboardButton("/gettags"),
 		),
 	)
 }
