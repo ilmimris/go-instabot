@@ -341,7 +341,7 @@ func loopTags(db *bolt.DB) {
 				numLiked = 0
 				numCommented = 0
 
-				text := fmt.Sprintf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
+				text := fmt.Sprintf("\n[%d/%d] ➜ Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
 				log.Println(text)
 				followRes <- TelegramResponse{text}
 				browse(tag, db)
@@ -359,7 +359,7 @@ func loopTags(db *bolt.DB) {
 		}
 
 		// Displays the report on the screen / log file
-		fmt.Println(reportAsString)
+		fmt.Println("\n\n\n" + reportAsString)
 
 		// Sends the report to the email in the config file, if the option is enabled
 		followRes <- TelegramResponse{reportAsString}
@@ -376,7 +376,7 @@ func browse(tag string, db *bolt.DB) {
 			return
 		}
 		// mutex.Unlock()
-		log.Println("Fetching the list of images for #" + tag + "\n")
+		log.Println("Fetching the list of images for #" + tag)
 		i++
 
 		// Getting all the pictures we can on the first page
