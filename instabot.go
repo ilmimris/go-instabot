@@ -205,11 +205,11 @@ func main() {
 			}
 		case resp := <-followRes:
 			if len(editMessage["follow"]) > 0 {
-				for _, msg := range editMessage["follow"] {
+				for UserID, EditID := range editMessage["follow"] {
 					edit := tgbotapi.EditMessageTextConfig{
 						BaseEdit: tgbotapi.BaseEdit{
-							ChatID:    int64(msg),
-							MessageID: editMessage["follow"][msg],
+							ChatID:    int64(UserID),
+							MessageID: EditID,
 						},
 						Text: resp.body,
 					}
@@ -217,15 +217,18 @@ func main() {
 				}
 			} else {
 				msg := tgbotapi.NewMessage(reportID, resp.body)
-				bot.Send(msg)
+				msgRes, err := bot.Send(msg)
+				if err == nil {
+					editMessage["follow"][int(reportID)] = msgRes.MessageID
+				}
 			}
 		case resp := <-unfollowRes:
 			if len(editMessage["unfollow"]) > 0 {
-				for _, msg := range editMessage["unfollow"] {
+				for UserID, EditID := range editMessage["unfollow"] {
 					edit := tgbotapi.EditMessageTextConfig{
 						BaseEdit: tgbotapi.BaseEdit{
-							ChatID:    int64(msg),
-							MessageID: editMessage["unfollow"][msg],
+							ChatID:    int64(UserID),
+							MessageID: EditID,
 						},
 						Text: resp.body,
 					}
@@ -233,15 +236,18 @@ func main() {
 				}
 			} else {
 				msg := tgbotapi.NewMessage(reportID, resp.body)
-				bot.Send(msg)
+				msgRes, err := bot.Send(msg)
+				if err == nil {
+					editMessage["unfollow"][int(reportID)] = msgRes.MessageID
+				}
 			}
 		case resp := <-followFollowersRes:
 			if len(editMessage["refollow"]) > 0 {
-				for _, msg := range editMessage["refollow"] {
+				for UserID, EditID := range editMessage["refollow"] {
 					edit := tgbotapi.EditMessageTextConfig{
 						BaseEdit: tgbotapi.BaseEdit{
-							ChatID:    int64(msg),
-							MessageID: editMessage["refollow"][msg],
+							ChatID:    int64(UserID),
+							MessageID: EditID,
 						},
 						Text: resp.body,
 					}
@@ -249,7 +255,10 @@ func main() {
 				}
 			} else {
 				msg := tgbotapi.NewMessage(reportID, resp.body)
-				bot.Send(msg)
+				msgRes, err := bot.Send(msg)
+				if err == nil {
+					editMessage["refollow"][int(reportID)] = msgRes.MessageID
+				}
 			}
 		}
 	}

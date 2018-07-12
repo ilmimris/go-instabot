@@ -94,7 +94,6 @@ func followFollowers(db *bolt.DB) {
 						break
 					}
 
-					fmt.Printf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
 					if user.IsPrivate {
 						log.Printf("%s is private, skipping\n", user.Username)
 					} else {
@@ -106,14 +105,16 @@ func followFollowers(db *bolt.DB) {
 							state["refollow"] = int(current * 100 / allCount)
 							state["refollow_current"] = current
 							state["refollow_all_count"] = allCount
+
+							text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
+							log.Println(text)
+							followFollowersRes <- TelegramResponse{text}
+
 							if !*dev {
 								insta.Follow(user.ID)
 								setFollowed(db, user.Username)
 								incStats(db, "follow")
 								incStats(db, "refollow")
-							}
-							followFollowersRes <- TelegramResponse{fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])}
-							if !*dev {
 								time.Sleep(10 * time.Second)
 							} else {
 								time.Sleep(1 * time.Second)
@@ -208,14 +209,13 @@ func syncFollowers(db *bolt.DB) {
 
 				mutex.Unlock()
 
-				fmt.Printf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])
+				text := fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])
+				log.Println(text)
+				unfollowRes <- TelegramResponse{text}
 				if !*dev {
 					insta.UnFollow(user.ID)
 					setFollowed(db, user.Username)
 					incStats(db, "unfollow")
-				}
-				unfollowRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])}
-				if !*dev {
 					time.Sleep(10 * time.Second)
 				} else {
 					time.Sleep(1 * time.Second)
@@ -341,9 +341,10 @@ func loopTags(db *bolt.DB) {
 				numLiked = 0
 				numCommented = 0
 
-				fmt.Printf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
+				text := fmt.Sprintf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
+				log.Println(text)
+				followRes <- TelegramResponse{text}
 				browse(db)
-				followRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])}
 			}
 			followRes <- TelegramResponse{"Finished"}
 		}
@@ -387,7 +388,6 @@ func browse(db *bolt.DB) {
 		// Check retry() for more info.
 
 		var images, ok = tagFeed[tag]
-
 		if ok {
 			log.Println("from cache #" + tag)
 		} else {
@@ -439,7 +439,6 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 		// Instagram will return a 500 sometimes, so we will retry 10 times.
 		// Check retry() for more info.
 		var posterInfo, ok = usersInfo[image.User.Username]
-
 		if ok {
 			log.Println("from cache " + posterInfo.User.Username + " - for #" + tag)
 		} else {
