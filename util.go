@@ -51,9 +51,6 @@ var numFollowed int
 var numLiked int
 var numCommented int
 
-// Will hold the tag value
-var tag string
-
 // check will log.Fatal if err is an error
 func check(err error) {
 	if err != nil {
@@ -186,4 +183,18 @@ func intInStringSlice(a int, list []string) bool {
 		}
 	}
 	return false
+}
+
+func SliceUnique(input []string) []string {
+	u := make([]string, 0, len(input))
+	m := make(map[string]bool)
+
+	for _, val := range input {
+		if _, ok := m[val]; !ok {
+			m[val] = true
+			u = append(u, val)
+		}
+	}
+
+	return u
 }

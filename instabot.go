@@ -191,12 +191,12 @@ func main() {
 					sendStats(bot, db, int64(update.Message.From.ID))
 				} else if Command == "getcomments" {
 					sendComments(bot, int64(update.Message.From.ID))
-				} else if Command == "updatecomments" {
-					updateComments(bot, Args, int64(update.Message.From.ID))
+				} else if Command == "addcomments" {
+					addComments(bot, Args, int64(update.Message.From.ID))
 				} else if Command == "gettags" {
 					sendTags(bot, int64(update.Message.From.ID))
-				} else if Command == "updatetags" {
-					updateTags(bot, Args, int64(update.Message.From.ID))
+				} else if Command == "addtag" {
+					addTag(bot, Args, int64(update.Message.From.ID))
 				} else if Text != "" {
 					msg.Text = Text
 					msg.ReplyMarkup = commandKeyboard
@@ -359,10 +359,12 @@ func sendComments(bot *tgbotapi.BotAPI, UserID int64) {
 	bot.Send(msg)
 }
 
-func updateComments(bot *tgbotapi.BotAPI, comments string, UserID int64) {
+func addComments(bot *tgbotapi.BotAPI, comments string, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	if len(comments) > 0 {
 		newComments := strings.Split(comments, ", ")
+		newComments = append(commentsList, newComments...)
+		newComments = SliceUnique(newComments)
 		viper.Set("comments", newComments)
 		viper.WriteConfig()
 		msg.Text = "Comments updated"
@@ -385,33 +387,33 @@ func sendTags(bot *tgbotapi.BotAPI, UserID int64) {
 	bot.Send(msg)
 }
 
-func updateTags(bot *tgbotapi.BotAPI, tags string, UserID int64) {
+func addTag(bot *tgbotapi.BotAPI, tag string, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
-	if len(tags) > 0 {
-		for _, tag := range strings.Split(tags, ", ") {
-			key := "tags." + tag
-			like := 20
-			if viper.IsSet(key + ".like") {
-				like = viper.GetInt(key + ".like")
-			}
-			viper.Set(key+".like", like)
-
-			comment := 2
-			if viper.IsSet(key + ".comment") {
-				comment = viper.GetInt(key + ".comment")
-			}
-			viper.Set(key+".comment", comment)
-
-			follow := 10
-			if viper.IsSet(key + ".follow") {
-				follow = viper.GetInt(key + ".follow")
-			}
-			viper.Set(key+".follow", follow)
+	// if len(tags) > 0 {
+	tag = strings.Replace(tag, ".", "", -1)
+	if len(tag) > 0 {
+		// 	for _, tag := range strings.Split(tags, ", ") {
+		key := "tags." + tag
+		like := 20
+		if viper.IsSet(key + ".like") {
+			like = viper.GetInt(key + ".like")
 		}
+		viper.Set(key+".like", like)
+		comment := 2
+		if viper.IsSet(key + ".comment") {
+			comment = viper.GetInt(key + ".comment")
+		}
+		viper.Set(key+".comment", comment)
+		follow := 10
+		if viper.IsSet(key + ".follow") {
+			follow = viper.GetInt(key + ".follow")
+		}
+		viper.Set(key+".follow", follow)
+		// }
 		viper.WriteConfig()
-		msg.Text = "Tags updated"
+		msg.Text = "Tag added"
 	} else {
-		msg.Text = "Tags is empty"
+		msg.Text = "Tag is empty"
 	}
 
 	bot.Send(msg)

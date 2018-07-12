@@ -311,7 +311,7 @@ func loopTags(db *bolt.DB) {
 		if allCount > 0 {
 			var current = 0
 
-			for tag = range tagsList {
+			for tag := range tagsList {
 				current++
 				mutex.Lock()
 				if state["follow_cancel"] > 0 {
@@ -344,7 +344,7 @@ func loopTags(db *bolt.DB) {
 				text := fmt.Sprintf("[%d/%d] Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
 				log.Println(text)
 				followRes <- TelegramResponse{text}
-				browse(db)
+				browse(tag, db)
 			}
 			followRes <- TelegramResponse{"Finished"}
 		}
@@ -367,7 +367,7 @@ func loopTags(db *bolt.DB) {
 }
 
 // Browses the page for a certain tag, until we reach the limits
-func browse(db *bolt.DB) {
+func browse(tag string, db *bolt.DB) {
 	var i = 0
 	for numFollowed < limits["follow"] || numLiked < limits["like"] || numCommented < limits["comment"] {
 		// mutex.Lock()
@@ -397,7 +397,7 @@ func browse(db *bolt.DB) {
 			check(err)
 		}
 
-		goThrough(db, images)
+		goThrough(tag, db, images)
 
 		if viper.IsSet("limits.maxRetry") && i > viper.GetInt("limits.maxRetry") {
 			log.Println("Currently not enough images for this tag to achieve goals")
@@ -407,7 +407,7 @@ func browse(db *bolt.DB) {
 }
 
 // Goes through all the images for a certain tag
-func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
+func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse) {
 	var i = 1
 	for _, image := range images.FeedsResponse.Items {
 		// mutex.Lock()
@@ -472,12 +472,12 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 		if like {
 			if userLikesCount, ok := likesToAccountPerSession[posterInfo.User.Username]; ok {
 				if userLikesCount < maxLikesToAccountPerSession {
-					likeImage(db, image, posterInfo)
+					likeImage(tag, db, image, posterInfo)
 				} else {
 					log.Println("Likes count per user reached [" + poster.Username + "]")
 				}
 			} else {
-				likeImage(db, image, posterInfo)
+				likeImage(tag, db, image, posterInfo)
 			}
 
 			previoslyFollowed, _ := getFollowed(db, posterInfo.User.Username)
@@ -486,11 +486,11 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 			} else {
 				if comment {
 					if !image.HasLiked {
-						commentImage(db, image)
+						commentImage(tag, db, image)
 					}
 				}
 				if follow {
-					followUser(db, posterInfo)
+					followUser(tag, db, posterInfo)
 				}
 			}
 
@@ -502,7 +502,7 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 }
 
 // Likes an image, if not liked already
-func likeImage(db *bolt.DB, image response.MediaItemResponse, userInfo response.GetUsernameResponse) {
+func likeImage(tag string, db *bolt.DB, image response.MediaItemResponse, userInfo response.GetUsernameResponse) {
 	log.Println("Liking the picture https://www.instagram.com/p/" + image.Code)
 	if !image.HasLiked {
 		if !*dev {
@@ -523,7 +523,7 @@ func likeImage(db *bolt.DB, image response.MediaItemResponse, userInfo response.
 }
 
 // Comments an image
-func commentImage(db *bolt.DB, image response.MediaItemResponse) {
+func commentImage(tag string, db *bolt.DB, image response.MediaItemResponse) {
 	rand.Seed(time.Now().Unix())
 	text := commentsList[rand.Intn(len(commentsList))]
 	if !*dev {
@@ -540,7 +540,7 @@ func commentImage(db *bolt.DB, image response.MediaItemResponse) {
 }
 
 // Follows a user, if not following already
-func followUser(db *bolt.DB, userInfo response.GetUsernameResponse) {
+func followUser(tag string, db *bolt.DB, userInfo response.GetUsernameResponse) {
 	user := userInfo.User
 
 	userFriendShip, err := insta.UserFriendShip(user.ID)
