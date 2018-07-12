@@ -436,7 +436,7 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 		// Check retry() for more info.
 		var posterInfo, ok = usersInfo[image.User.Username]
 		if ok {
-			log.Println("from cache " + posterInfo.User.Username + " - for #" + tag)
+			// log.Println("from cache " + posterInfo.User.Username + " - for #" + tag)
 		} else {
 			err := retry(10, 20*time.Second, func() (err error) {
 				posterInfo, err = insta.GetUserByID(image.User.ID)
@@ -453,8 +453,14 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 
 		//buildLine()
 
-		log.Println("Checking followers for " + poster.Username + " - for #" + tag)
-		log.Printf("%s has %d followers\n", poster.Username, followerCount)
+		// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
+		if followerCount < likeLowerLimit && followerCount < likeUpperLimit {
+			log.Printf("%s has %d followers, less than min %d\n", poster.Username, followerCount, likeLowerLimit)
+		} else if followerCount > likeUpperLimit {
+			log.Printf("%s has %d followers, more than max %d\n", poster.Username, followerCount, likeUpperLimit)
+		} else {
+			log.Printf("%s has %d followers\n", poster.Username, followerCount)
+		}
 		i++
 
 		// Will only follow and comment if we like the picture
@@ -486,7 +492,7 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 				}
 			}
 		}
-		log.Printf("%s done\n\n", poster.Username)
+		// log.Printf("%s done\n\n", poster.Username)
 
 		// This is to avoid the temporary ban by Instagram
 		time.Sleep(20 * time.Second)
