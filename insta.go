@@ -370,12 +370,12 @@ func loopTags(db *bolt.DB) {
 func browse(db *bolt.DB) {
 	var i = 0
 	for numFollowed < limits["follow"] || numLiked < limits["like"] || numCommented < limits["comment"] {
-		mutex.Lock()
+		// mutex.Lock()
 		if state["follow_cancel"] > 0 {
-			mutex.Unlock()
+			// mutex.Unlock()
 			return
 		}
-		mutex.Unlock()
+		// mutex.Unlock()
 		log.Println("Fetching the list of images for #" + tag + "\n")
 		i++
 
@@ -410,12 +410,12 @@ func browse(db *bolt.DB) {
 func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 	var i = 1
 	for _, image := range images.FeedsResponse.Items {
-		mutex.Lock()
+		// mutex.Lock()
 		if state["follow_cancel"] > 0 {
-			mutex.Unlock()
+			// mutex.Unlock()
 			return
 		}
-		mutex.Unlock()
+		// mutex.Unlock()
 		// Exiting the loop if there is nothing left to do
 		if numFollowed >= limits["follow"] && numLiked >= limits["like"] && numCommented >= limits["comment"] {
 			break
@@ -493,11 +493,11 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 					followUser(db, posterInfo)
 				}
 			}
+
+			// This is to avoid the temporary ban by Instagram
+			time.Sleep(20 * time.Second)
 		}
 		// log.Printf("%s done\n\n", poster.Username)
-
-		// This is to avoid the temporary ban by Instagram
-		time.Sleep(20 * time.Second)
 	}
 }
 
