@@ -485,7 +485,9 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 				log.Printf("%s already following (%s), skipping\n", posterInfo.User.Username, previoslyFollowed)
 			} else {
 				if comment {
-					commentImage(db, image)
+					if !image.HasLiked {
+						commentImage(db, image)
+					}
 				}
 				if follow {
 					followUser(db, posterInfo)
