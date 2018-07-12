@@ -9,7 +9,6 @@ import (
 	"os"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -44,13 +43,8 @@ var limits map[string]int
 // Comments list
 var commentsList []string
 
-// Line is a struct to store one line of the report
-type line struct {
-	Tag, Action string
-}
-
 // Report that will be sent at the end of the script
-var report map[line]int
+var report map[string]map[string]int
 
 // Counters that will be incremented while we like, comment, and follow
 var numFollowed int
@@ -127,11 +121,7 @@ func getConfig() {
 	instaUsername = viper.GetString("user.instagram.username")
 	instaPassword = viper.GetString("user.instagram.password")
 
-	type Report struct {
-		Tag, Action string
-	}
-
-	report = make(map[line]int)
+	report = make(map[string]map[string]int)
 }
 
 // Sends an telegram. Check out the "telegram" section of the "config.json" file.
@@ -165,20 +155,6 @@ func retry(maxAttempts int, sleep time.Duration, function func() error) (err err
 
 	send(fmt.Sprintf("The script has stopped due to an unrecoverable error :\n%s", err), false)
 	return fmt.Errorf("After %d attempts, last error: %s", maxAttempts, err)
-}
-
-// Builds the line for the report and prints it
-func buildLine() {
-	reportTag := ""
-	for index, element := range report {
-		if index.Tag == tag {
-			reportTag += fmt.Sprintf("%s %d/%d - ", index.Action, element, limits[index.Action])
-		}
-	}
-	// Prints the report line on the screen / in the log file
-	if reportTag != "" {
-		log.Println(strings.TrimSuffix(reportTag, " - "))
-	}
 }
 
 func Shuffle(slice interface{}) {

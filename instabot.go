@@ -145,7 +145,6 @@ func main() {
 							}
 						} else {
 							state["refollow"] = 0
-							report = make(map[line]int)
 							msg.Text = "Starting refollow"
 							msgRes, err := bot.Send(msg)
 							if err == nil {
@@ -289,7 +288,7 @@ func startFollow(bot *tgbotapi.BotAPI, UserID int64) {
 		}
 	} else {
 		state["follow"] = 0
-		report = make(map[line]int)
+		report = make(map[string]map[string]int)
 		likesToAccountPerSession = make(map[string]int)
 		msg.Text = "Starting follow"
 		msgRes, err := bot.Send(msg)

@@ -354,12 +354,8 @@ func loopTags(db *bolt.DB) {
 		mutex.Unlock()
 
 		reportAsString := ""
-		for index, element := range report {
-			if index.Action == "like" {
-				reportAsString += fmt.Sprintf("#%s liked: %d\n", index.Tag, element)
-			} else {
-				reportAsString += fmt.Sprintf("#%s %sed: %d\n", index.Tag, index.Action, element)
-			}
+		for tag, _ := range report {
+			reportAsString += fmt.Sprintf("#%s: followed — %d, liked — %d, commented — %d\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
 		}
 
 		// Displays the report on the screen / log file
@@ -455,7 +451,7 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 		poster := posterInfo.User
 		followerCount := poster.FollowerCount
 
-		buildLine()
+		//buildLine()
 
 		log.Println("Checking followers for " + poster.Username + " - for #" + tag)
 		log.Printf("%s has %d followers\n", poster.Username, followerCount)
@@ -504,9 +500,13 @@ func likeImage(db *bolt.DB, image response.MediaItemResponse, userInfo response.
 		if !*dev {
 			insta.Like(image.ID)
 		}
-		log.Println("Liked")
+		// log.Println("Liked")
 		numLiked++
-		report[line{tag, "like"}]++
+
+		if _, ok := report[tag]; !ok {
+			report[tag] = make(map[string]int)
+		}
+		report[tag]["like"]++
 		incStats(db, "like")
 		likesToAccountPerSession[userInfo.User.Username]++
 	} else {
@@ -523,7 +523,11 @@ func commentImage(db *bolt.DB, image response.MediaItemResponse) {
 	}
 	log.Println("Commented " + text)
 	numCommented++
-	report[line{tag, "comment"}]++
+
+	if _, ok := report[tag]; !ok {
+		report[tag] = make(map[string]int)
+	}
+	report[tag]["comment"]++
 	incStats(db, "comment")
 }
 
@@ -543,9 +547,12 @@ func followUser(db *bolt.DB, userInfo response.GetUsernameResponse) {
 				insta.Follow(user.ID)
 			}
 		}
-		log.Println("Followed")
+		// log.Println("Followed")
 		numFollowed++
-		report[line{tag, "follow"}]++
+		if _, ok := report[tag]; !ok {
+			report[tag] = make(map[string]int)
+		}
+		report[tag]["follow"]++
 		incStats(db, "follow")
 		setFollowed(db, user.Username)
 	} else {
