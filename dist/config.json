@@ -16,6 +16,7 @@
     "limits": {
         "maxSync": 1000,
         "daysBeforeUnfollow": 2,
+        "max_likes_to_account_per_session": 3,
         "maxRetry": 2,
         "like": {
             "min": 0,

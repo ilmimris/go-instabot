@@ -33,6 +33,8 @@ var followUpperLimit int
 var commentLowerLimit int
 var commentUpperLimit int
 
+var maxLikesToAccountPerSession int
+
 // Hashtags list. Do not put the '#' in the config file
 var tagsList map[string]interface{}
 
@@ -110,6 +112,9 @@ func getConfig() {
 
 	commentLowerLimit = viper.GetInt("limits.comment.min")
 	commentUpperLimit = viper.GetInt("limits.comment.max")
+
+	viper.SetDefault("limits.max_likes_to_account_per_session", 10)
+	maxLikesToAccountPerSession = viper.GetInt("limits.max_likes_to_account_per_session")
 
 	tagsList = viper.GetStringMap("tags")
 

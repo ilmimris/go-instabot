@@ -468,7 +468,15 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 
 		// Like, then comment/follow
 		if like {
-			likeImage(db, image)
+			if userLikesCount, ok := likesToAccountPerSession[posterInfo.User.Username]; ok {
+				if userLikesCount < maxLikesToAccountPerSession {
+					likeImage(db, image, posterInfo)
+				} else {
+					log.Println("Likes count per user reached [" + poster.Username + "]")
+				}
+			} else {
+				likeImage(db, image, posterInfo)
+			}
 
 			previoslyFollowed, _ := getFollowed(db, posterInfo.User.Username)
 			if previoslyFollowed != "" {
@@ -490,7 +498,7 @@ func goThrough(db *bolt.DB, images response.TagFeedsResponse) {
 }
 
 // Likes an image, if not liked already
-func likeImage(db *bolt.DB, image response.MediaItemResponse) {
+func likeImage(db *bolt.DB, image response.MediaItemResponse, userInfo response.GetUsernameResponse) {
 	log.Println("Liking the picture https://www.instagram.com/p/" + image.Code)
 	if !image.HasLiked {
 		if !*dev {
@@ -500,6 +508,7 @@ func likeImage(db *bolt.DB, image response.MediaItemResponse) {
 		numLiked++
 		report[line{tag, "like"}]++
 		incStats(db, "like")
+		likesToAccountPerSession[userInfo.User.Username]++
 	} else {
 		log.Println("Image already liked")
 	}

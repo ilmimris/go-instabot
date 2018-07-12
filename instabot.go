@@ -27,9 +27,10 @@ var (
 	unfollowRes        chan TelegramResponse
 	followFollowersRes chan TelegramResponse
 
-	state       = make(map[string]int)
-	editMessage = make(map[string]map[int]int)
-	mutex       = &sync.Mutex{}
+	state                    = make(map[string]int)
+	editMessage              = make(map[string]map[int]int)
+	likesToAccountPerSession = make(map[string]int)
+	mutex                    = &sync.Mutex{}
 
 	reportID      int64
 	admins        []string
@@ -289,6 +290,7 @@ func startFollow(bot *tgbotapi.BotAPI, UserID int64) {
 	} else {
 		state["follow"] = 0
 		report = make(map[line]int)
+		likesToAccountPerSession = make(map[string]int)
 		msg.Text = "Starting follow"
 		msgRes, err := bot.Send(msg)
 		if err == nil {
