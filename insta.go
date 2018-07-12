@@ -385,7 +385,7 @@ func browse(db *bolt.DB) {
 
 		var images, ok = tagFeed[tag]
 		if ok {
-			log.Println("from cache #" + tag)
+			// log.Println("from cache #" + tag)
 		} else {
 			err := retry(10, 20*time.Second, func() (err error) {
 				images, err = insta.TagFeed(tag)
@@ -516,7 +516,7 @@ func likeImage(db *bolt.DB, image response.MediaItemResponse, userInfo response.
 		incStats(db, "like")
 		likesToAccountPerSession[userInfo.User.Username]++
 	} else {
-		log.Println("Image already liked")
+		// log.Println("Image already liked")
 	}
 }
 
@@ -540,7 +540,6 @@ func commentImage(db *bolt.DB, image response.MediaItemResponse) {
 // Follows a user, if not following already
 func followUser(db *bolt.DB, userInfo response.GetUsernameResponse) {
 	user := userInfo.User
-	log.Printf("Following %s\n", user.Username)
 
 	userFriendShip, err := insta.UserFriendShip(user.ID)
 	check(err)
@@ -548,8 +547,9 @@ func followUser(db *bolt.DB, userInfo response.GetUsernameResponse) {
 	if !userFriendShip.Following {
 		if !*dev {
 			if user.IsPrivate {
-				log.Printf("%s is private, skipping\n", user.Username)
+				log.Printf("%s is private, skipping follow\n", user.Username)
 			} else {
+				log.Printf("Following %s\n", user.Username)
 				insta.Follow(user.ID)
 			}
 		}
