@@ -97,7 +97,7 @@ func main() {
 
 	c.AddFunc("0 0 8 * * *", func() { fmt.Println("Start follow"); startFollow(bot, reportID) })
 	c.AddFunc("0 0 20 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot, reportID) })
-	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db, reportID) })
+	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db, -1) })
 
 	for _, task := range c.Entries() {
 		log.Println(task.Next)
@@ -344,7 +344,14 @@ func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, UserID int64) {
 	commentCount, _ := getStats(db, "comment")
 	if unfollowCount > 0 || followCount > 0 || refollowCount > 0 || likeCount > 0 || commentCount > 0 {
 		msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nRefollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, refollowCount, likeCount, commentCount)
-		bot.Send(msg)
+		if UserID == -1 {
+			for UserID := range admins {
+				msg.ChatID = int64(UserID)
+				bot.Send(msg)
+			}
+		} else {
+			bot.Send(msg)
+		}
 	}
 }
 
