@@ -90,7 +90,7 @@ func followFollowers(db *bolt.DB) {
 					if state["refollow_cancel"] > 0 {
 						state["refollow_cancel"] = 0
 						mutex.Unlock()
-						followFollowersRes <- TelegramResponse{"refollowwing canceled"}
+						followFollowersRes <- TelegramResponse{"refollowing canceled"}
 						break
 					}
 
@@ -473,6 +473,7 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse) {
 			if userLikesCount, ok := likesToAccountPerSession[posterInfo.User.Username]; ok {
 				if userLikesCount < maxLikesToAccountPerSession {
 					likeImage(tag, db, image, posterInfo)
+					image.HasLiked = true
 				} else {
 					log.Println("Likes count per user reached [" + poster.Username + "]")
 				}
