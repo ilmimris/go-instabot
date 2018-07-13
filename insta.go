@@ -51,8 +51,8 @@ func refollowManager(db *bolt.DB) (startChan chan bool, outerChan chan string, i
 				}
 			case msg := <-outerChan:
 				fmt.Println("refollow <- ", msg)
-			default:
-				time.Sleep(100 * time.Millisecond)
+				//default:
+				//	time.Sleep(100 * time.Millisecond)
 			}
 		}
 	}()
@@ -135,7 +135,7 @@ func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 									state["refollow_current"] = current
 									state["refollow_all_count"] = allCount
 
-									text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
+									text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
 									followFollowersRes <- TelegramResponse{text}
 
 									if !*dev {
@@ -159,8 +159,8 @@ func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			state["refollow"] = -1
 			followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", state["refollow_current"])}
 			return
-		default:
-			time.Sleep(100 * time.Millisecond)
+			//default:
+			//	time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
@@ -183,8 +183,8 @@ func unfollowManager(db *bolt.DB) (startChan chan bool, outerChan chan string, i
 				}
 			case msg := <-outerChan:
 				fmt.Println("unfollow <- ", msg)
-			default:
-				time.Sleep(100 * time.Millisecond)
+				//default:
+				//	time.Sleep(100 * time.Millisecond)
 			}
 		}
 	}()
@@ -281,8 +281,8 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			state["unfollow"] = -1
 			unfollowRes <- TelegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", state["unfollow_current"])}
 			return
-		default:
-			time.Sleep(100 * time.Millisecond)
+			//default:
+			//	time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
@@ -372,8 +372,8 @@ func followManager(db *bolt.DB) (startChan chan bool, outerChan chan string, inn
 				}
 			case msg := <-outerChan:
 				fmt.Println("follow <- ", msg)
-			default:
-				time.Sleep(100 * time.Millisecond)
+				//default:
+				//	time.Sleep(100 * time.Millisecond)
 			}
 		}
 	}()
@@ -450,8 +450,8 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				followRes <- TelegramResponse{reportAsString}
 			}
 			return
-		default:
-			time.Sleep(100 * time.Millisecond)
+			//default:
+			//	time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
