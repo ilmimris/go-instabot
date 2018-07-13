@@ -128,7 +128,7 @@ func main() {
 						state["refollow_cancel"] = 0
 						if state["refollow"] >= 0 {
 							msg.Text = fmt.Sprintf("Refollow in progress (%d%%)", state["refollow"])
-							if editMessage["refollow"][update.Message.From.ID] > 0 {
+							if len(editMessage["refollow"]) > 0 && intInStringSlice(int(update.Message.From.ID), GetKeys(editMessage["refollow"])) {
 								edit := tgbotapi.EditMessageTextConfig{
 									BaseEdit: tgbotapi.BaseEdit{
 										ChatID:    int64(update.Message.From.ID),
@@ -269,7 +269,7 @@ func startFollow(bot *tgbotapi.BotAPI, UserID int64) {
 	state["follow_cancel"] = 0
 	if state["follow"] >= 0 {
 		msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
-		if len(editMessage["follow"]) > 0 {
+		if len(editMessage["follow"]) > 0 && intInStringSlice(int(UserID), GetKeys(editMessage["follow"])) {
 			for UserID, EditID := range editMessage["follow"] {
 				edit := tgbotapi.EditMessageTextConfig{
 					BaseEdit: tgbotapi.BaseEdit{
@@ -304,7 +304,7 @@ func startUnfollow(bot *tgbotapi.BotAPI, UserID int64) {
 	state["unfollow_cancel"] = 0
 	if state["unfollow"] >= 0 {
 		msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
-		if len(editMessage["unfollow"]) > 0 {
+		if len(editMessage["unfollow"]) > 0 && intInStringSlice(int(UserID), GetKeys(editMessage["unfollow"])) {
 			for UserID, EditID := range editMessage["unfollow"] {
 				edit := tgbotapi.EditMessageTextConfig{
 					BaseEdit: tgbotapi.BaseEdit{
