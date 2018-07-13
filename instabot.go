@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/boltdb/bolt"
@@ -336,8 +337,9 @@ func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, UserID int64) {
 	if unfollowCount > 0 || followCount > 0 || refollowCount > 0 || likeCount > 0 || commentCount > 0 {
 		msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nRefollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, refollowCount, likeCount, commentCount)
 		if UserID == -1 {
-			for UserID := range admins {
-				msg.ChatID = int64(UserID)
+			for _, id := range admins {
+				UserID, _ = strconv.ParseInt(id, 10, 64)
+				msg.ChatID = UserID
 				bot.Send(msg)
 			}
 		} else {
