@@ -299,70 +299,106 @@ func createKey() []byte {
 	return key
 }
 
+func followManager(db *bolt.DB) (startChan chan bool, outerChan chan string, innerChan chan string, stopChan chan bool) {
+	startChan = make(chan bool)
+	outerChan = make(chan string)
+	innerChan = make(chan string)
+	stopChan = make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-startChan:
+				if !followIsStarted.IsSet() {
+					followIsStarted.Set()
+					go loopTags(db, innerChan, stopChan)
+					innerChan <- "start"
+				} else {
+					fmt.Println("can't start task, task already running!")
+				}
+			case msg := <-outerChan:
+				fmt.Println(": outerChan <- ", msg)
+			default:
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}()
+	return startChan, outerChan, innerChan, stopChan
+}
+
 // Go through all the tags in the list
-func loopTags(db *bolt.DB) {
+func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 	usersInfo = make(map[string]response.GetUsernameResponse)
 	tagFeed = make(map[string]response.TagFeedsResponse)
 
-	for msg := range followReq {
-		log.Println(msg)
-		time.Sleep(1 * time.Second)
-		var allCount = len(tagsList)
-		if allCount > 0 {
-			var current = 0
+	defer followIsStarted.UnSet()
+	for {
+		select {
+		case msg := <-innerChan:
+			fmt.Println("innerChan <- ", msg)
+			go func() {
+				state["follow"] = 0
+				for {
+					// runtime.Gosched()
+					for msg := range followReq {
+						log.Println(msg)
+						time.Sleep(1 * time.Second)
+						var allCount = len(tagsList)
+						if allCount > 0 {
+							var current = 0
 
-			for tag := range tagsList {
-				current++
-				mutex.Lock()
-				if state["follow_cancel"] > 0 {
-					state["follow_cancel"] = 0
-					state["follow"] = -1
-					editMessage["follow"] = make(map[int]int)
-					mutex.Unlock()
-					followRes <- TelegramResponse{"Following canceled"}
-					return
+							for tag := range tagsList {
+								current++
+
+								mutex.Lock()
+								state["follow"] = int(current * 100 / allCount)
+								state["follow_current"] = current
+								state["follow_all_count"] = allCount
+								mutex.Unlock()
+
+								limitsConf := viper.GetStringMap("tags." + tag)
+
+								// Some converting
+								limits = map[string]int{
+									"follow":  int(limitsConf["follow"].(float64)),
+									"like":    int(limitsConf["like"].(float64)),
+									"comment": int(limitsConf["comment"].(float64)),
+								}
+
+								// What we did so far
+								numFollowed = 0
+								numLiked = 0
+								numCommented = 0
+
+								text := fmt.Sprintf("\n[%d/%d] ➜ Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
+								log.Println(text)
+								followRes <- TelegramResponse{text}
+								browse(tag, db)
+							}
+						}
+
+						fmt.Println("Finished")
+						followRes <- TelegramResponse{"Finished"}
+
+						stopChan <- true
+						return
+					}
 				}
+			}()
+		case <-stopChan:
+			editMessage["follow"] = make(map[int]int)
+			state["follow"] = -1
 
-				state["follow"] = int(current * 100 / allCount)
-				state["follow_current"] = current
-				state["follow_all_count"] = allCount
-				mutex.Unlock()
-
-				limitsConf := viper.GetStringMap("tags." + tag)
-
-				// Some converting
-				limits = map[string]int{
-					"follow":  int(limitsConf["follow"].(float64)),
-					"like":    int(limitsConf["like"].(float64)),
-					"comment": int(limitsConf["comment"].(float64)),
-				}
-				// What we did so far
-				numFollowed = 0
-				numLiked = 0
-				numCommented = 0
-
-				text := fmt.Sprintf("\n[%d/%d] ➜ Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
-				log.Println(text)
-				followRes <- TelegramResponse{text}
-				browse(tag, db)
+			reportAsString := ""
+			for tag, _ := range report {
+				reportAsString += fmt.Sprintf("#%s: followed — %d, liked — %d, commented — %d\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
 			}
-			followRes <- TelegramResponse{"Finished"}
+			fmt.Println("\n\n\n" + reportAsString)
+			followRes <- TelegramResponse{reportAsString}
+			return
+
+		default:
+			time.Sleep(100 * time.Millisecond)
 		}
-		mutex.Lock()
-		state["follow"] = -1
-		editMessage["follow"] = make(map[int]int)
-		mutex.Unlock()
-
-		reportAsString := ""
-		for tag, _ := range report {
-			reportAsString += fmt.Sprintf("#%s: followed — %d, liked — %d, commented — %d\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
-		}
-
-		// Displays the report on the screen / log file
-		fmt.Println("\n\n\n" + reportAsString)
-
-		// Sends the report to the email in the config file, if the option is enabled
-		followRes <- TelegramResponse{reportAsString}
 	}
 }
 
@@ -370,12 +406,6 @@ func loopTags(db *bolt.DB) {
 func browse(tag string, db *bolt.DB) {
 	var i = 0
 	for numFollowed < limits["follow"] || numLiked < limits["like"] || numCommented < limits["comment"] {
-		// mutex.Lock()
-		if state["follow_cancel"] > 0 {
-			// mutex.Unlock()
-			return
-		}
-		// mutex.Unlock()
 		log.Println("Fetching the list of images for #" + tag)
 		i++
 
@@ -410,12 +440,6 @@ func browse(tag string, db *bolt.DB) {
 func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse) {
 	var i = 1
 	for _, image := range images.FeedsResponse.Items {
-		// mutex.Lock()
-		if state["follow_cancel"] > 0 {
-			// mutex.Unlock()
-			return
-		}
-		// mutex.Unlock()
 		// Exiting the loop if there is nothing left to do
 		if numFollowed >= limits["follow"] && numLiked >= limits["like"] && numCommented >= limits["comment"] {
 			break
@@ -450,8 +474,6 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse) {
 
 		poster := posterInfo.User
 		followerCount := poster.FollowerCount
-
-		//buildLine()
 
 		// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
 		if followerCount < likeLowerLimit && followerCount < likeUpperLimit {

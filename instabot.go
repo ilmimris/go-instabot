@@ -11,6 +11,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/robfig/cron"
 	"github.com/spf13/viper"
+	"github.com/tevino/abool"
 	"gopkg.in/telegram-bot-api.v4"
 )
 
@@ -39,11 +40,12 @@ var (
 	instaPassword string
 
 	commandKeyboard tgbotapi.ReplyKeyboardMarkup
+
+	followIsStarted = abool.New()
 )
 var db *bolt.DB
 
 func main() {
-	state["follow"] = -1
 	state["unfollow"] = -1
 	state["refollow"] = -1
 
@@ -64,7 +66,7 @@ func main() {
 	go login()
 	// создаем канал
 	followReq = make(chan string, 2)
-	go loopTags(db)
+	startFollowChan, _, _, stopFollowChan := followManager(db)
 	followRes = make(chan TelegramResponse, 2)
 
 	// создаем канал
@@ -95,7 +97,7 @@ func main() {
 		log.Fatalf("[INIT] [Failed to init Telegram updates chan: %v]", err)
 	}
 
-	c.AddFunc("0 0 8 * * *", func() { fmt.Println("Start follow"); startFollow(bot, reportID) })
+	c.AddFunc("0 0 8 * * *", func() { fmt.Println("Start follow"); startFollow(bot, startFollowChan, reportID) })
 	c.AddFunc("0 0 20 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot, reportID) })
 	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db, -1) })
 
@@ -154,7 +156,7 @@ func main() {
 						}
 					}
 				} else if Command == "follow" {
-					startFollow(bot, int64(update.Message.From.ID))
+					startFollow(bot, startFollowChan, int64(update.Message.From.ID))
 				} else if Command == "unfollow" {
 					startUnfollow(bot, int64(update.Message.From.ID))
 				} else if Command == "progress" {
@@ -176,9 +178,10 @@ func main() {
 						editMessage["progress"][update.Message.From.ID] = msgRes.MessageID
 					}
 				} else if Command == "cancelfollow" {
-					mutex.Lock()
-					state["follow_cancel"] = 1
-					mutex.Unlock()
+					if followIsStarted.IsSet() {
+						stopFollowChan <- true
+						followRes <- TelegramResponse{"Following canceled"}
+					}
 				} else if Command == "cancelunfollow" {
 					mutex.Lock()
 					state["unfollow_cancel"] = 1
@@ -264,10 +267,9 @@ func main() {
 	}
 }
 
-func startFollow(bot *tgbotapi.BotAPI, UserID int64) {
+func startFollow(bot *tgbotapi.BotAPI, startChan chan bool, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
-	state["follow_cancel"] = 0
-	if state["follow"] >= 0 {
+	if followIsStarted.IsSet() {
 		msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
 		if len(editMessage["follow"]) > 0 && intInStringSlice(int(UserID), GetKeys(editMessage["follow"])) {
 			for UserID, EditID := range editMessage["follow"] {
@@ -287,7 +289,7 @@ func startFollow(bot *tgbotapi.BotAPI, UserID int64) {
 			}
 		}
 	} else {
-		state["follow"] = 0
+		startChan <- true
 		report = make(map[string]map[string]int)
 		likesToAccountPerSession = make(map[string]int)
 		msg.Text = "Starting follow"
@@ -295,7 +297,7 @@ func startFollow(bot *tgbotapi.BotAPI, UserID int64) {
 		if err == nil {
 			editMessage["follow"][int(UserID)] = msgRes.MessageID
 		}
-		followReq <- "Starting follow"
+		followReq <- msg.Text
 	}
 }
 
