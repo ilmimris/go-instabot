@@ -33,195 +33,256 @@ func login() {
 	}
 }
 
-func followFollowers(db *bolt.DB) {
-	for msg := range followFollowersReq {
-		time.Sleep(1 * time.Second)
-		username := msg.CommandArguments()
-		user, err := insta.GetUserByUsername(username)
-		if err != nil {
-			followFollowersRes <- TelegramResponse{fmt.Sprintf("%s", err)}
-		} else {
-			if user.User.IsPrivate {
-				userFriendShip, err := insta.UserFriendShip(user.User.ID)
-				check(err)
-				if !userFriendShip.Following {
-					followFollowersRes <- TelegramResponse{"User profile is private and we are not following, can't process"}
+func refollowManager(db *bolt.DB) (startChan chan bool, outerChan chan string, innerChan chan string, stopChan chan bool) {
+	startChan = make(chan bool)
+	outerChan = make(chan string)
+	innerChan = make(chan string)
+	stopChan = make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-startChan:
+				if !refollowIsStarted.IsSet() {
+					refollowIsStarted.Set()
+					go followFollowers(db, innerChan, stopChan)
+					// innerChan <- "start"
+				} else {
+					fmt.Println("can't start task, task already running!")
 				}
+			case msg := <-outerChan:
+				fmt.Println("refollow <- ", msg)
+			default:
+				time.Sleep(100 * time.Millisecond)
 			}
+		}
+	}()
+	return startChan, outerChan, innerChan, stopChan
+}
 
-			followers, err := insta.TotalUserFollowers(user.User.ID)
-			//log.Println(followers)
-			check(err)
-			var users = followers.Users
-			if len(users) > 0 {
-				rand.Seed(time.Now().UnixNano()) // do it once during app initialization
-				Shuffle(users)
-			}
-
-			var limit = viper.GetInt("limits.maxSync")
-			if limit <= 0 || limit >= 1000 {
-				limit = 1000
-			}
-
-			today, _ := getStats(db, "refollow")
-			if today > 0 {
-				limit = limit - today
-			}
-
-			var allCount = int(math.Min(float64(len(users)), float64(limit)))
-			if allCount == 0 && len(users) > 0 {
-				followFollowersRes <- TelegramResponse{"Follow limit reached :("}
-			} else if allCount <= 0 {
-				followFollowersRes <- TelegramResponse{"Followers not found :("}
-			} else {
-				var current = 0
-
-				followFollowersRes <- TelegramResponse{fmt.Sprintf("%d will be followed", allCount)}
-
-				for _, user := range users {
-					if current >= limit {
-						continue
-					}
-
-					mutex.Lock()
-					if state["refollow_cancel"] > 0 {
-						state["refollow_cancel"] = 0
-						mutex.Unlock()
-						followFollowersRes <- TelegramResponse{"refollowing canceled"}
-						break
-					}
-
-					if user.IsPrivate {
-						log.Printf("%s is private, skipping\n", user.Username)
-					} else {
-						previoslyFollowed, _ := getFollowed(db, user.Username)
-						if previoslyFollowed != "" {
-							log.Printf("%s previously followed at %s, skipping\n", user.Username, previoslyFollowed)
-						} else {
-							current++
-							state["refollow"] = int(current * 100 / allCount)
-							state["refollow_current"] = current
-							state["refollow_all_count"] = allCount
-
-							text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
-							followFollowersRes <- TelegramResponse{text}
-
-							if !*dev {
-								insta.Follow(user.ID)
-								setFollowed(db, user.Username)
-								incStats(db, "follow")
-								incStats(db, "refollow")
-								time.Sleep(10 * time.Second)
-							} else {
-								time.Sleep(1 * time.Second)
-							}
+func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
+	defer refollowIsStarted.UnSet()
+	for {
+		select {
+		case msg := <-innerChan:
+			fmt.Println("refollow <- ", msg)
+			go func() {
+				state["refollow"] = 0
+				time.Sleep(1 * time.Second)
+				username := msg
+				user, err := insta.GetUserByUsername(username)
+				if err != nil {
+					followFollowersRes <- TelegramResponse{fmt.Sprintf("%s", err)}
+					stopChan <- true
+					return
+				} else {
+					if user.User.IsPrivate {
+						userFriendShip, err := insta.UserFriendShip(user.User.ID)
+						check(err)
+						if !userFriendShip.Following {
+							followFollowersRes <- TelegramResponse{"User profile is private and we are not following, can't process"}
+							stopChan <- true
+							return
 						}
 					}
 
-					mutex.Unlock()
+					followers, err := insta.TotalUserFollowers(user.User.ID)
+					//log.Println(followers)
+					check(err)
+					var users = followers.Users
+					if len(users) > 0 {
+						rand.Seed(time.Now().UnixNano()) // do it once during app initialization
+						Shuffle(users)
+					}
+
+					var limit = viper.GetInt("limits.maxSync")
+					if limit <= 0 || limit >= 1000 {
+						limit = 1000
+					}
+
+					today, _ := getStats(db, "refollow")
+					if today > 0 {
+						limit = limit - today
+					}
+
+					var allCount = int(math.Min(float64(len(users)), float64(limit)))
+					if allCount == 0 && len(users) > 0 {
+						followFollowersRes <- TelegramResponse{"Follow limit reached :("}
+					} else if allCount <= 0 {
+						followFollowersRes <- TelegramResponse{"Followers not found :("}
+					} else {
+						var current = 0
+
+						followFollowersRes <- TelegramResponse{fmt.Sprintf("%d users will be followed", allCount)}
+
+						for _, user := range users {
+							if !refollowIsStarted.IsSet() {
+								stopChan <- true
+								return
+							}
+							if current >= limit {
+								continue
+							}
+
+							if user.IsPrivate {
+								log.Printf("%s is private, skipping\n", user.Username)
+							} else {
+								previoslyFollowed, _ := getFollowed(db, user.Username)
+								if previoslyFollowed != "" {
+									log.Printf("%s previously followed at %s, skipping\n", user.Username, previoslyFollowed)
+								} else {
+									current++
+									state["refollow"] = int(current * 100 / allCount)
+									state["refollow_current"] = current
+									state["refollow_all_count"] = allCount
+
+									text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
+									followFollowersRes <- TelegramResponse{text}
+
+									if !*dev {
+										insta.Follow(user.ID)
+										setFollowed(db, user.Username)
+										incStats(db, "follow")
+										incStats(db, "refollow")
+										time.Sleep(10 * time.Second)
+									} else {
+										time.Sleep(2 * time.Second)
+									}
+								}
+							}
+						}
+					}
 				}
-				followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", current)}
-			}
-			mutex.Lock()
-			state["refollow"] = -1
+				stopChan <- true
+			}()
+		case <-stopChan:
 			editMessage["refollow"] = make(map[int]int)
-			mutex.Unlock()
+			state["refollow"] = -1
+			followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", state["refollow_current"])}
+			return
+		default:
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
 
-func syncFollowers(db *bolt.DB) {
-	for msg := range unfollowReq {
-		log.Println(msg)
-		time.Sleep(1 * time.Second)
-		following, err := insta.SelfTotalUserFollowing()
-		check(err)
-		followers, err := insta.SelfTotalUserFollowers()
-		check(err)
-
-		var users []response.User
-		for _, user := range following.Users {
-			if !contains(followers.Users, user) {
-				users = append(users, user)
+func unfollowManager(db *bolt.DB) (startChan chan bool, outerChan chan string, innerChan chan string, stopChan chan bool) {
+	startChan = make(chan bool)
+	outerChan = make(chan string)
+	innerChan = make(chan string)
+	stopChan = make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-startChan:
+				if !unfollowIsStarted.IsSet() {
+					unfollowIsStarted.Set()
+					go syncFollowers(db, innerChan, stopChan)
+					innerChan <- "start"
+				} else {
+					fmt.Println("can't start task, task already running!")
+				}
+			case msg := <-outerChan:
+				fmt.Println("unfollow <- ", msg)
+			default:
+				time.Sleep(100 * time.Millisecond)
 			}
 		}
+	}()
+	return startChan, outerChan, innerChan, stopChan
+}
 
-		var limit = viper.GetInt("limits.maxSync")
-		if limit <= 0 || limit >= 1000 {
-			limit = 1000
-		}
+func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
+	defer unfollowIsStarted.UnSet()
+	for {
+		select {
+		case msg := <-innerChan:
+			fmt.Println("unfollow <- ", msg)
+			go func() {
+				state["unfollow"] = 0
+				time.Sleep(1 * time.Second)
+				following, err := insta.SelfTotalUserFollowing()
+				check(err)
+				followers, err := insta.SelfTotalUserFollowers()
+				check(err)
 
-		var daysBeforeUnfollow = viper.GetInt("limits.daysBeforeUnfollow")
-		if daysBeforeUnfollow <= 1 || daysBeforeUnfollow >= 14 {
-			daysBeforeUnfollow = 3
-		}
-
-		today, _ := getStats(db, "unfollow")
-		if today > 0 {
-			limit = limit - today
-		}
-
-		var allCount = int(math.Min(float64(len(users)), float64(limit)))
-		if allCount > 0 {
-			var current = 0
-
-			unfollowRes <- TelegramResponse{fmt.Sprintf("%d will be unfollowed", allCount)}
-
-			for _, user := range users {
-				if current >= limit {
-					continue
+				var users []response.User
+				for _, user := range following.Users {
+					if !contains(followers.Users, user) {
+						users = append(users, user)
+					}
 				}
 
-				mutex.Lock()
-				if state["unfollow_cancel"] > 0 {
-					state["unfollow_cancel"] = 0
-					mutex.Unlock()
-					unfollowRes <- TelegramResponse{"Unfollowing canceled"}
-					break
+				var limit = viper.GetInt("limits.maxSync")
+				if limit <= 0 || limit >= 1000 {
+					limit = 1000
 				}
 
-				previoslyFollowed, _ := getFollowed(db, user.Username)
-				if previoslyFollowed != "" {
-					t, err := time.Parse("20060102", previoslyFollowed)
+				var daysBeforeUnfollow = viper.GetInt("limits.daysBeforeUnfollow")
+				if daysBeforeUnfollow <= 1 || daysBeforeUnfollow >= 14 {
+					daysBeforeUnfollow = 3
+				}
 
-					if err != nil {
-						fmt.Println(err)
-					} else {
-						duration := time.Since(t)
-						if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
-							fmt.Printf("%s not followed us less then %f hours, skipping!\n", user.Username, duration.Hours())
+				today, _ := getStats(db, "unfollow")
+				if today > 0 {
+					limit = limit - today
+				}
 
-							mutex.Unlock()
+				var current = 0
+				var allCount = int(math.Min(float64(len(users)), float64(limit)))
+				if allCount > 0 {
+					unfollowRes <- TelegramResponse{fmt.Sprintf("%d will be unfollowed", allCount)}
+
+					for _, user := range users {
+						if !unfollowIsStarted.IsSet() {
+							stopChan <- true
+							return
+						}
+
+						if current >= limit {
 							continue
+						}
+
+						previoslyFollowed, _ := getFollowed(db, user.Username)
+						if previoslyFollowed != "" {
+							t, err := time.Parse("20060102", previoslyFollowed)
+
+							if err != nil {
+								fmt.Println(err)
+							} else {
+								duration := time.Since(t)
+								if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
+									fmt.Printf("%s not followed us less then %f hours, skipping!\n", user.Username, duration.Hours())
+									continue
+								}
+							}
+						}
+
+						current++
+						state["unfollow"] = int(current * 100 / allCount)
+						state["unfollow_current"] = current
+						state["unfollow_all_count"] = allCount
+
+						unfollowRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])}
+						if !*dev {
+							insta.UnFollow(user.ID)
+							setFollowed(db, user.Username)
+							incStats(db, "unfollow")
+							time.Sleep(10 * time.Second)
+						} else {
+							time.Sleep(2 * time.Second)
 						}
 					}
 				}
 
-				current++
-				state["unfollow"] = int(current * 100 / allCount)
-				state["unfollow_current"] = current
-				state["unfollow_all_count"] = allCount
-
-				mutex.Unlock()
-
-				text := fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])
-				unfollowRes <- TelegramResponse{text}
-				if !*dev {
-					insta.UnFollow(user.ID)
-					setFollowed(db, user.Username)
-					incStats(db, "unfollow")
-					time.Sleep(10 * time.Second)
-				} else {
-					time.Sleep(1 * time.Second)
-				}
-			}
-
-			mutex.Lock()
-			state["unfollow"] = -1
+				stopChan <- true
+			}()
+		case <-stopChan:
 			editMessage["unfollow"] = make(map[int]int)
-			mutex.Unlock()
-
-			unfollowRes <- TelegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", current)}
+			state["unfollow"] = -1
+			unfollowRes <- TelegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", state["unfollow_current"])}
+			return
+		default:
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
@@ -310,7 +371,7 @@ func followManager(db *bolt.DB) (startChan chan bool, outerChan chan string, inn
 					fmt.Println("can't start task, task already running!")
 				}
 			case msg := <-outerChan:
-				fmt.Println(": outerChan <- ", msg)
+				fmt.Println("follow <- ", msg)
 			default:
 				time.Sleep(100 * time.Millisecond)
 			}
@@ -328,55 +389,56 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 	for {
 		select {
 		case msg := <-innerChan:
-			fmt.Println("innerChan <- ", msg)
+			fmt.Println("follow <- ", msg)
 			go func() {
 				state["follow"] = 0
-				for {
-					// runtime.Gosched()
-					for msg := range followReq {
-						log.Println(msg)
-						time.Sleep(1 * time.Second)
-						var allCount = len(tagsList)
-						if allCount > 0 {
-							var current = 0
+				time.Sleep(1 * time.Second)
 
-							for tag := range tagsList {
-								current++
+				report = make(map[string]map[string]int)
+				likesToAccountPerSession = make(map[string]int)
 
-								mutex.Lock()
-								state["follow"] = int(current * 100 / allCount)
-								state["follow_current"] = current
-								state["follow_all_count"] = allCount
-								mutex.Unlock()
+				time.Sleep(1 * time.Second)
+				var allCount = len(tagsList)
+				if allCount > 0 {
+					var current = 0
 
-								limitsConf := viper.GetStringMap("tags." + tag)
-
-								// Some converting
-								limits = map[string]int{
-									"follow":  int(limitsConf["follow"].(float64)),
-									"like":    int(limitsConf["like"].(float64)),
-									"comment": int(limitsConf["comment"].(float64)),
-								}
-
-								// What we did so far
-								numFollowed = 0
-								numLiked = 0
-								numCommented = 0
-
-								text := fmt.Sprintf("\n[%d/%d] ➜ Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
-								followRes <- TelegramResponse{text}
-								browse(tag, db)
-							}
+					for tag := range tagsList {
+						if !followIsStarted.IsSet() {
+							stopChan <- true
+							return
 						}
 
-						followRes <- TelegramResponse{"Follow finished"}
+						current++
 
-						stopChan <- true
-						return
+						state["follow"] = int(current * 100 / allCount)
+						state["follow_current"] = current
+						state["follow_all_count"] = allCount
+
+						limitsConf := viper.GetStringMap("tags." + tag)
+
+						// Some converting
+						limits = map[string]int{
+							"follow":  int(limitsConf["follow"].(float64)),
+							"like":    int(limitsConf["like"].(float64)),
+							"comment": int(limitsConf["comment"].(float64)),
+						}
+
+						// What we did so far
+						numFollowed = 0
+						numLiked = 0
+						numCommented = 0
+
+						text := fmt.Sprintf("\n[%d/%d] ➜ Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
+						followRes <- TelegramResponse{text}
+						browse(tag, db, stopChan)
 					}
 				}
+
+				stopChan <- true
 			}()
 		case <-stopChan:
+			followRes <- TelegramResponse{"Follow finished"}
+
 			editMessage["follow"] = make(map[int]int)
 			state["follow"] = -1
 
@@ -384,9 +446,10 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			for tag, _ := range report {
 				reportAsString += fmt.Sprintf("#%s: followed — %d, liked — %d, commented — %d\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
 			}
-			followRes <- TelegramResponse{reportAsString}
+			if reportAsString != "" {
+				followRes <- TelegramResponse{reportAsString}
+			}
 			return
-
 		default:
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -394,9 +457,14 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 }
 
 // Browses the page for a certain tag, until we reach the limits
-func browse(tag string, db *bolt.DB) {
+func browse(tag string, db *bolt.DB, stopChan chan bool) {
 	var i = 0
 	for numFollowed < limits["follow"] || numLiked < limits["like"] || numCommented < limits["comment"] {
+		if !followIsStarted.IsSet() {
+			stopChan <- true
+			return
+		}
+
 		log.Println("Fetching the list of images for #" + tag)
 		i++
 
@@ -418,7 +486,7 @@ func browse(tag string, db *bolt.DB) {
 			check(err)
 		}
 
-		goThrough(tag, db, images)
+		goThrough(tag, db, images, stopChan)
 
 		if viper.IsSet("limits.maxRetry") && i > viper.GetInt("limits.maxRetry") {
 			log.Println("Currently not enough images for this tag to achieve goals")
@@ -428,9 +496,13 @@ func browse(tag string, db *bolt.DB) {
 }
 
 // Goes through all the images for a certain tag
-func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse) {
+func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopChan chan bool) {
 	var i = 1
 	for _, image := range images.FeedsResponse.Items {
+		if !followIsStarted.IsSet() {
+			stopChan <- true
+			return
+		}
 		// Exiting the loop if there is nothing left to do
 		if numFollowed >= limits["follow"] && numLiked >= limits["like"] && numCommented >= limits["comment"] {
 			break
