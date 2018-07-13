@@ -207,6 +207,7 @@ func main() {
 				}
 			}
 		case resp := <-followRes:
+			fmt.Println(resp.body)
 			if len(editMessage["follow"]) > 0 {
 				for UserID, EditID := range editMessage["follow"] {
 					edit := tgbotapi.EditMessageTextConfig{
@@ -226,6 +227,7 @@ func main() {
 				}
 			}
 		case resp := <-unfollowRes:
+			fmt.Println(resp.body)
 			if len(editMessage["unfollow"]) > 0 {
 				for UserID, EditID := range editMessage["unfollow"] {
 					edit := tgbotapi.EditMessageTextConfig{
@@ -245,6 +247,7 @@ func main() {
 				}
 			}
 		case resp := <-followFollowersRes:
+			fmt.Println(resp.body)
 			if len(editMessage["refollow"]) > 0 {
 				for UserID, EditID := range editMessage["refollow"] {
 					edit := tgbotapi.EditMessageTextConfig{

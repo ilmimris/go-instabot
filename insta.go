@@ -71,14 +71,11 @@ func followFollowers(db *bolt.DB) {
 			var allCount = int(math.Min(float64(len(users)), float64(limit)))
 			if allCount == 0 && len(users) > 0 {
 				followFollowersRes <- TelegramResponse{"Follow limit reached :("}
-				fmt.Println("Follow limit reached :(")
 			} else if allCount <= 0 {
 				followFollowersRes <- TelegramResponse{"Followers not found :("}
-				fmt.Println("Followers not found :(")
 			} else {
 				var current = 0
 
-				fmt.Printf("\n%d followers!\n", allCount)
 				followFollowersRes <- TelegramResponse{fmt.Sprintf("%d will be followed", allCount)}
 
 				for _, user := range users {
@@ -107,7 +104,6 @@ func followFollowers(db *bolt.DB) {
 							state["refollow_all_count"] = allCount
 
 							text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)\n", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
-							log.Println(text)
 							followFollowersRes <- TelegramResponse{text}
 
 							if !*dev {
@@ -169,7 +165,6 @@ func syncFollowers(db *bolt.DB) {
 		if allCount > 0 {
 			var current = 0
 
-			fmt.Printf("%d users are not following you back!\n", allCount)
 			unfollowRes <- TelegramResponse{fmt.Sprintf("%d will be unfollowed", allCount)}
 
 			for _, user := range users {
@@ -210,7 +205,6 @@ func syncFollowers(db *bolt.DB) {
 				mutex.Unlock()
 
 				text := fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])
-				log.Println(text)
 				unfollowRes <- TelegramResponse{text}
 				if !*dev {
 					insta.UnFollow(user.ID)
@@ -370,14 +364,12 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 								numCommented = 0
 
 								text := fmt.Sprintf("\n[%d/%d] ➜ Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
-								log.Println(text)
 								followRes <- TelegramResponse{text}
 								browse(tag, db)
 							}
 						}
 
-						fmt.Println("Finished")
-						followRes <- TelegramResponse{"Finished"}
+						followRes <- TelegramResponse{"Follow finished"}
 
 						stopChan <- true
 						return
@@ -392,7 +384,6 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			for tag, _ := range report {
 				reportAsString += fmt.Sprintf("#%s: followed — %d, liked — %d, commented — %d\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
 			}
-			fmt.Println("\n\n\n" + reportAsString)
 			followRes <- TelegramResponse{reportAsString}
 			return
 
