@@ -392,26 +392,51 @@ func addTag(bot *tgbotapi.BotAPI, tag string, UserID int64) {
 	// if len(tags) > 0 {
 	tag = strings.Replace(tag, ".", "", -1)
 	if len(tag) > 0 {
-		// 	for _, tag := range strings.Split(tags, ", ") {
-		key := "tags." + tag
-		like := 20
-		if viper.IsSet(key + ".like") {
-			like = viper.GetInt(key + ".like")
+		if strings.Contains(tag, ", ") {
+			newTags := strings.Split(tag, ", ")
+			for _, tag := range newTags {
+				key := "tags." + tag
+				like := 20
+				if viper.IsSet(key + ".like") {
+					like = viper.GetInt(key + ".like")
+				}
+				viper.Set(key+".like", like)
+				comment := 2
+				if viper.IsSet(key + ".comment") {
+					comment = viper.GetInt(key + ".comment")
+				}
+				viper.Set(key+".comment", comment)
+				follow := 10
+				if viper.IsSet(key + ".follow") {
+					follow = viper.GetInt(key + ".follow")
+				}
+				viper.Set(key+".follow", follow)
+				// }
+			}
+			viper.WriteConfig()
+			msg.Text = "Tags added"
+		} else {
+			// 	for _, tag := range strings.Split(tags, ", ") {
+			key := "tags." + tag
+			like := 20
+			if viper.IsSet(key + ".like") {
+				like = viper.GetInt(key + ".like")
+			}
+			viper.Set(key+".like", like)
+			comment := 2
+			if viper.IsSet(key + ".comment") {
+				comment = viper.GetInt(key + ".comment")
+			}
+			viper.Set(key+".comment", comment)
+			follow := 10
+			if viper.IsSet(key + ".follow") {
+				follow = viper.GetInt(key + ".follow")
+			}
+			viper.Set(key+".follow", follow)
+			// }
+			viper.WriteConfig()
+			msg.Text = "Tag added"
 		}
-		viper.Set(key+".like", like)
-		comment := 2
-		if viper.IsSet(key + ".comment") {
-			comment = viper.GetInt(key + ".comment")
-		}
-		viper.Set(key+".comment", comment)
-		follow := 10
-		if viper.IsSet(key + ".follow") {
-			follow = viper.GetInt(key + ".follow")
-		}
-		viper.Set(key+".follow", follow)
-		// }
-		viper.WriteConfig()
-		msg.Text = "Tag added"
 	} else {
 		msg.Text = "Tag is empty"
 	}

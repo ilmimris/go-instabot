@@ -444,7 +444,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 
 			reportAsString := ""
 			for tag, _ := range report {
-				reportAsString += fmt.Sprintf("#%s: followed — %d, liked — %d, commented — %d\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
+				reportAsString += fmt.Sprintf("#%s: %d 🐾, %d 👍, %d 💌\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
 			}
 			if reportAsString != "" {
 				followRes <- TelegramResponse{reportAsString}
