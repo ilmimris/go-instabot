@@ -200,26 +200,43 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			go func() {
 				state["unfollow"] = 0
 				time.Sleep(1 * time.Second)
-				following, err := insta.SelfTotalUserFollowing()
-				check(err)
-				followers, err := insta.SelfTotalUserFollowers()
-				check(err)
+				following, _ := insta.SelfTotalUserFollowing()
+				// check(err)
+				followers, _ := insta.SelfTotalUserFollowers()
+				// check(err)
+
+				var daysBeforeUnfollow = viper.GetInt("limits.daysBeforeUnfollow")
+				if daysBeforeUnfollow <= 1 || daysBeforeUnfollow >= 14 {
+					daysBeforeUnfollow = 3
+				}
 
 				var users []response.User
 				for _, user := range following.Users {
 					if !contains(followers.Users, user) {
-						users = append(users, user)
+						previoslyFollowed, _ := getFollowed(db, user.Username)
+						if previoslyFollowed != "" {
+							t, err := time.Parse("20060102", previoslyFollowed)
+
+							if err != nil {
+								fmt.Println(err)
+							} else {
+								duration := time.Since(t)
+								if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
+									fmt.Printf("%s not followed us less then %f hours, skipping!\n", user.Username, duration.Hours())
+									continue
+								} else {
+									users = append(users, user)
+								}
+							}
+						} else {
+							users = append(users, user)
+						}
 					}
 				}
 
 				var limit = viper.GetInt("limits.maxSync")
 				if limit <= 0 || limit >= 1000 {
 					limit = 1000
-				}
-
-				var daysBeforeUnfollow = viper.GetInt("limits.daysBeforeUnfollow")
-				if daysBeforeUnfollow <= 1 || daysBeforeUnfollow >= 14 {
-					daysBeforeUnfollow = 3
 				}
 
 				today, _ := getStats(db, "unfollow")
@@ -240,21 +257,6 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 
 						if current >= limit {
 							continue
-						}
-
-						previoslyFollowed, _ := getFollowed(db, user.Username)
-						if previoslyFollowed != "" {
-							t, err := time.Parse("20060102", previoslyFollowed)
-
-							if err != nil {
-								fmt.Println(err)
-							} else {
-								duration := time.Since(t)
-								if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
-									fmt.Printf("%s not followed us less then %f hours, skipping!\n", user.Username, duration.Hours())
-									continue
-								}
-							}
 						}
 
 						current++
