@@ -950,3 +950,17 @@ func getLastLikers() (result []string) {
 	// log.Println(len(result), result)
 	return result
 }
+
+func likeFollowersPosts() {
+	timeline, _ := insta.Timeline("")
+	items := timeline.Items[0:20]
+	if len(items) > 0 {
+		for _, item := range items {
+			// log.Println(item.ID, item.Caption, item.User.Username)
+			if !item.HasLiked {
+				insta.Like(item.ID)
+				incStats(db, "like")
+			}
+		}
+	}
+}
