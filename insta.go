@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -236,6 +235,45 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 					}
 				}
 
+				lastLikers := getLastLikers()
+				if len(lastLikers) > 0 {
+					if len(following.Users) > 0 {
+						unfollowRes <- TelegramResponse{fmt.Sprintf("Found %d following, %d likers for last 10 posts\n", len(following.Users), len(lastLikers))}
+						var notLikers []response.User
+						for _, user := range following.Users {
+							if !stringInStringSlice(user.Username, lastLikers) {
+								notLikers = append(notLikers, user)
+							}
+						}
+
+						if len(notLikers) > 0 {
+							for _, user := range notLikers {
+								previoslyFollowed, _ := getFollowed(db, user.Username)
+								if previoslyFollowed != "" {
+									t, err := time.Parse("20060102", previoslyFollowed)
+
+									if err != nil {
+										fmt.Println(err)
+									} else {
+										duration := time.Since(t)
+										if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
+
+										} else {
+											if !contains(users, user) {
+												users = append(users, user)
+											}
+										}
+									}
+								} else {
+									if !contains(users, user) {
+										users = append(users, user)
+									}
+								}
+							}
+						}
+					}
+				}
+
 				var limit = viper.GetInt("limits.maxSync")
 				if limit <= 0 || limit >= 1000 {
 					limit = 1000
@@ -289,25 +327,6 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			//	time.Sleep(100 * time.Millisecond)
 		}
 	}
-}
-
-func getInput(text string) string {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf(text)
-
-	input, err := reader.ReadString('\n')
-	check(err)
-	return strings.TrimSpace(input)
-}
-
-// Checks if the user is in the slice
-func contains(slice []response.User, user response.User) bool {
-	for _, currentUser := range slice {
-		if currentUser == user {
-			return true
-		}
-	}
-	return false
 }
 
 // Logins and saves the session
@@ -911,4 +930,23 @@ func updateLimits(bot *tgbotapi.BotAPI, limitStr string, UserID int64) {
 	}
 
 	bot.Send(msg)
+}
+
+func getLastLikers() (result []string) {
+	latest, _ := insta.LatestFeed()
+	l := latest.Items[0:10] //last 10 posts
+	for _, item := range l {
+		// log.Println(item.ID, item.HasLiked, item.LikeCount)
+		if item.LikeCount > 0 {
+			likers, _ := insta.MediaLikers(item.ID)
+			for _, liker := range likers.Users {
+				// log.Println(liker.Username, liker.HasAnonymousProfilePicture)
+				if !stringInStringSlice(liker.Username, result) {
+					result = append(result, liker.Username)
+				}
+			}
+		}
+	}
+	// log.Println(len(result), result)
+	return result
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -9,9 +10,11 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
+	"github.com/tducasse/goinsta/response"
 	"gopkg.in/telegram-bot-api.v4"
 )
 
@@ -212,4 +215,23 @@ func SliceUnique(input []string) []string {
 	}
 
 	return u
+}
+
+func getInput(text string) string {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf(text)
+
+	input, err := reader.ReadString('\n')
+	check(err)
+	return strings.TrimSpace(input)
+}
+
+// Checks if the user is in the slice
+func contains(slice []response.User, user response.User) bool {
+	for _, currentUser := range slice {
+		if currentUser == user {
+			return true
+		}
+	}
+	return false
 }

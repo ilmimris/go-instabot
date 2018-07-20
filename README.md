@@ -61,7 +61,7 @@ Commands list for BotFather:
  - gettags - список тэгов для /follow
  - addtags - добавить тэги (через ", ")
  - removetags - удалить тэги (через ", ")
- - getlimits - получить список знчений лимитов
+ - getlimits - получить список значений лимитов
  - updatelimits - установить значение лимита
 
 There, in the 'dist/' folder, you will find a sample 'config.json', that you have to copy to the 'config/' folder :
