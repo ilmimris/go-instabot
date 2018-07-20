@@ -469,7 +469,7 @@ func updateLimits(bot *tgbotapi.BotAPI, limitStr string, UserID int64) {
 		limitCount, _ := strconv.Atoi(count)
 		if stringInStringSlice(limit, limits) {
 			if limitCount >= 0 && limitCount <= 10000 {
-				viper.Set(limit, limitCount)
+				viper.Set("limits."+limit, limitCount)
 				viper.WriteConfig()
 				msg.Text = "Limit updated"
 			} else {
