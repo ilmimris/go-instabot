@@ -953,8 +953,13 @@ func getLastLikers() (result []string) {
 
 func likeFollowersPosts() {
 	timeline, _ := insta.Timeline("")
-	items := timeline.Items[0:20]
-	if len(items) > 0 {
+	len := len(timeline.Items)
+	if len > 20 {
+		len = 20
+	}
+
+	if len > 0 {
+		items := timeline.Items[0:len]
 		for _, item := range items {
 			// log.Println(item.ID, item.Caption, item.User.Username)
 			if !item.HasLiked {
