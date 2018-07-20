@@ -161,7 +161,7 @@ func main() {
 					addComments(bot, Args, int64(update.Message.From.ID))
 				} else if Command == "gettags" {
 					sendTags(bot, int64(update.Message.From.ID))
-				} else if Command == "addtag" {
+				} else if Command == "addtags" {
 					addTag(bot, Args, int64(update.Message.From.ID))
 				} else if Text != "" {
 					msg.Text = Text
