@@ -167,6 +167,8 @@ func main() {
 					addTags(bot, Args, int64(update.Message.From.ID))
 				} else if Command == "removetags" {
 					removeTags(bot, Args, int64(update.Message.From.ID))
+				} else if Command == "updatelimits" {
+					updateLimits(bot, Args, int64(update.Message.From.ID))
 				} else if Text != "" {
 					msg.Text = Text
 					msg.ReplyMarkup = commandKeyboard
@@ -451,6 +453,31 @@ func removeTags(bot *tgbotapi.BotAPI, tags string, UserID int64) {
 		msg.Text = "Tags removed"
 	} else {
 		msg.Text = "Tags is empty"
+	}
+
+	bot.Send(msg)
+}
+
+func updateLimits(bot *tgbotapi.BotAPI, limitStr string, UserID int64) {
+	msg := tgbotapi.NewMessage(UserID, "")
+	s := strings.Split(limitStr, " ")
+	limits := []string{"maxSync", "daysBeforeUnfollow", "max_likes_to_account_per_session", "maxRetry", "like.min", "like.count", "like.max", "follow.min", "follow.count", "follow.max", "comment.min", "comment.count", "comment.max"}
+	if len(s) != 2 {
+		msg.Text = "/updatelimits limitname integer\nlimitname maybe one of: " + strings.Join(limits, ", ")
+	} else {
+		limit, count := s[0], s[1]
+		limitCount, _ := strconv.Atoi(count)
+		if stringInStringSlice(limit, limits) {
+			if limitCount >= 0 && limitCount <= 10000 {
+				viper.Set(limit, limitCount)
+				viper.WriteConfig()
+				msg.Text = "Limit updated"
+			} else {
+				msg.Text = "/updatelimits limitname integer\ncount should be equal or greater than 0 and less or equal than 10000"
+			}
+		} else {
+			msg.Text = "/updatelimits limitname integer\nlimitname maybe one of: " + strings.Join(limits, ", ")
+		}
 	}
 
 	bot.Send(msg)
