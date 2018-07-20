@@ -170,6 +170,8 @@ func main() {
 					getLimits(bot, int64(update.Message.From.ID))
 				} else if Command == "updatelimits" {
 					updateLimits(bot, Args, int64(update.Message.From.ID))
+				} else if Command == "like" {
+					likeFollowersPosts()
 				} else if Text != "" {
 					msg.Text = Text
 					msg.ReplyMarkup = commandKeyboard
