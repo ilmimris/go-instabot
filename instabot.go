@@ -85,7 +85,7 @@ func main() {
 	c.AddFunc("0 0 8 * * *", func() { fmt.Println("Start follow"); startFollow(bot, startFollowChan, reportID) })
 	c.AddFunc("0 0 20 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot, startUnfollowChan, reportID) })
 	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db, -1) })
-	c.AddFunc("0 0 0,1,10-21 * * *", func() { fmt.Println("Like followers"); likeFollowersPosts() })
+	c.AddFunc("0 0 0,1,10-21 * * *", func() { fmt.Println("Like followers"); likeFollowersPosts(db) })
 
 	for _, task := range c.Entries() {
 		log.Println(task.Next)
@@ -171,7 +171,7 @@ func main() {
 				} else if Command == "updatelimits" {
 					updateLimits(bot, Args, int64(update.Message.From.ID))
 				} else if Command == "like" {
-					likeFollowersPosts()
+					likeFollowersPosts(db)
 				} else if Text != "" {
 					msg.Text = Text
 					msg.ReplyMarkup = commandKeyboard

@@ -951,7 +951,7 @@ func getLastLikers() (result []string) {
 	return result
 }
 
-func likeFollowersPosts() {
+func likeFollowersPosts(db *bolt.DB) {
 	timeline, _ := insta.Timeline("")
 	len := len(timeline.Items)
 	if len > 20 {
