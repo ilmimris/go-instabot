@@ -44,7 +44,21 @@ Go to the project folder :
 
 `cd [YOUR_GO_PATH]/src/github.com/tducasse/go-instabot`
 
-For your telegram id ask [@getidsbot](https://t.me/getidsbot), for bot token ask [@BotFather](https://t.me/BotFather)
+For your telegram id ask [@getidsbot](https://t.me/getidsbot), for bot token ask [@BotFather](https://t.me/BotFather).
+
+Commands list for BotFather:
+ - stats - статистика за день
+ - progress - текущий прогресс запущенных задач
+ - follow - запустить задачи по подписке/лайкам/комментам
+ - unfollow - отписаться от тех кто не подписан на нас
+ - refollow - подписаться на подписчиков @...
+ - cancelfollow - остановить задачу подписок
+ - cancelunfollow - остановить задачу отписок
+ - cancelrefollow - прекратить подписку на подписчиков пользователя
+ - getcomments - список комментов для отправки
+ - gettags - список тэгов для /follow
+ - addcomments - добавить комменты (через ", ")
+ - addtags - добавить тэги (через ", ")
 
 There, in the 'dist/' folder, you will find a sample 'config.json', that you have to copy to the 'config/' folder :
 
