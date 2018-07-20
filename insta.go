@@ -404,7 +404,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				if allCount > 0 {
 					var current = 0
 
-					for tag := range tagsList {
+					for _, tag := range tagsList {
 						if !followIsStarted.IsSet() {
 							stopChan <- true
 							return
@@ -416,14 +416,14 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						state["follow_current"] = current
 						state["follow_all_count"] = allCount
 
-						limitsConf := viper.GetStringMap("tags." + tag)
+						// limitsConf := viper.GetStringMap("tags." + tag)
 
-						// Some converting
-						limits = map[string]int{
-							"follow":  int(limitsConf["follow"].(float64)),
-							"like":    int(limitsConf["like"].(float64)),
-							"comment": int(limitsConf["comment"].(float64)),
-						}
+						// // Some converting
+						// limits = map[string]int{
+						// 	"follow":  int(limitsConf["follow"].(float64)),
+						// 	"like":    int(limitsConf["like"].(float64)),
+						// 	"comment": int(limitsConf["comment"].(float64)),
+						// }
 
 						// What we did so far
 						numFollowed = 0
@@ -461,7 +461,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 // Browses the page for a certain tag, until we reach the limits
 func browse(tag string, db *bolt.DB, stopChan chan bool) {
 	var i = 0
-	for numFollowed < limits["follow"] || numLiked < limits["like"] || numCommented < limits["comment"] {
+	for numFollowed < followCount || numLiked < likeCount || numCommented < commentCount {
 		if !followIsStarted.IsSet() {
 			stopChan <- true
 			return
@@ -506,7 +506,7 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 			return
 		}
 		// Exiting the loop if there is nothing left to do
-		if numFollowed >= limits["follow"] && numLiked >= limits["like"] && numCommented >= limits["comment"] {
+		if numFollowed >= followCount && numLiked >= likeCount && numCommented >= commentCount {
 			break
 		}
 
@@ -516,7 +516,7 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		}
 
 		// Check if we should fetch new images for tag
-		if i >= limits["follow"] && i >= limits["like"] && i >= limits["comment"] {
+		if i >= followCount && i >= likeCount && i >= commentCount {
 			break
 		}
 
@@ -551,9 +551,9 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		i++
 
 		// Will only follow and comment if we like the picture
-		like := followerCount > likeLowerLimit && followerCount < likeUpperLimit && numLiked < limits["like"]
-		follow := followerCount > followLowerLimit && followerCount < followUpperLimit && numFollowed < limits["follow"] && like
-		comment := followerCount > commentLowerLimit && followerCount < commentUpperLimit && numCommented < limits["comment"] && like
+		like := followerCount > likeLowerLimit && followerCount < likeUpperLimit && numLiked < likeCount
+		follow := followerCount > followLowerLimit && followerCount < followUpperLimit && numFollowed < followCount && like
+		comment := followerCount > commentLowerLimit && followerCount < commentUpperLimit && numCommented < commentCount && like
 
 		// Like, then comment/follow
 		if like {

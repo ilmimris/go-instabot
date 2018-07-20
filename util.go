@@ -21,21 +21,24 @@ var dev *bool
 // An image will be liked if the poster has more followers than likeLowerLimit, and less than likeUpperLimit
 var likeLowerLimit int
 var likeUpperLimit int
+var likeCount int
 
 // A user will be followed if he has more followers than followLowerLimit, and less than followUpperLimit
 // Needs to be a subset of the like interval
 var followLowerLimit int
 var followUpperLimit int
+var followCount int
 
 // An image will be commented if the poster has more followers than commentLowerLimit, and less than commentUpperLimit
 // Needs to be a subset of the like interval
 var commentLowerLimit int
 var commentUpperLimit int
+var commentCount int
 
 var maxLikesToAccountPerSession int
 
 // Hashtags list. Do not put the '#' in the config file
-var tagsList map[string]interface{}
+var tagsList []string
 
 // Limits for the current hashtag
 var limits map[string]int
@@ -97,17 +100,20 @@ func getConfig() {
 
 	likeLowerLimit = viper.GetInt("limits.like.min")
 	likeUpperLimit = viper.GetInt("limits.like.max")
+	likeCount = viper.GetInt("limits.like.count")
 
 	followLowerLimit = viper.GetInt("limits.follow.min")
 	followUpperLimit = viper.GetInt("limits.follow.max")
+	followCount = viper.GetInt("limits.follow.count")
 
 	commentLowerLimit = viper.GetInt("limits.comment.min")
 	commentUpperLimit = viper.GetInt("limits.comment.max")
+	commentCount = viper.GetInt("limits.comment.count")
 
 	viper.SetDefault("limits.max_likes_to_account_per_session", 10)
 	maxLikesToAccountPerSession = viper.GetInt("limits.max_likes_to_account_per_session")
 
-	tagsList = viper.GetStringMap("tags")
+	tagsList = viper.GetStringSlice("tags")
 
 	commentsList = viper.GetStringSlice("comments")
 
@@ -179,6 +185,15 @@ func intInStringSlice(a int, list []string) bool {
 	b := strconv.Itoa(a)
 	for _, c := range list {
 		if b == c {
+			return true
+		}
+	}
+	return false
+}
+
+func stringInStringSlice(a string, list []string) bool {
+	for _, b := range list {
+		if a == b {
 			return true
 		}
 	}

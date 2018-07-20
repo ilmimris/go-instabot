@@ -159,10 +159,14 @@ func main() {
 					sendComments(bot, int64(update.Message.From.ID))
 				} else if Command == "addcomments" {
 					addComments(bot, Args, int64(update.Message.From.ID))
+				} else if Command == "removecomments" {
+					removeComments(bot, Args, int64(update.Message.From.ID))
 				} else if Command == "gettags" {
 					sendTags(bot, int64(update.Message.From.ID))
 				} else if Command == "addtags" {
-					addTag(bot, Args, int64(update.Message.From.ID))
+					addTags(bot, Args, int64(update.Message.From.ID))
+				} else if Command == "removetags" {
+					removeTags(bot, Args, int64(update.Message.From.ID))
 				} else if Text != "" {
 					msg.Text = Text
 					msg.ReplyMarkup = commandKeyboard
@@ -375,11 +379,35 @@ func addComments(bot *tgbotapi.BotAPI, comments string, UserID int64) {
 	bot.Send(msg)
 }
 
+func removeComments(bot *tgbotapi.BotAPI, comments string, UserID int64) {
+	msg := tgbotapi.NewMessage(UserID, "")
+	if len(comments) > 0 {
+		removeComments := strings.Split(comments, ", ")
+		var newComments []string
+		for _, comment := range commentsList {
+			if stringInStringSlice(comment, removeComments) {
+
+			} else {
+				newComments = append(newComments, comment)
+			}
+		}
+		newComments = SliceUnique(newComments)
+		viper.Set("comments", newComments)
+		viper.WriteConfig()
+		msg.Text = "Comments removed"
+	} else {
+		msg.Text = "Comments is empty"
+	}
+
+	bot.Send(msg)
+}
+
 func sendTags(bot *tgbotapi.BotAPI, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	if len(tagsList) > 0 {
-		keys := GetKeys(tagsList)
-		msg.Text = strings.Join(keys, ", ")
+		// keys := GetKeys(tagsList)
+		// msg.Text = strings.Join(keys, ", ")
+		msg.Text = strings.Join(tagsList, ", ")
 	} else {
 		msg.Text = "Tags is empty"
 	}
@@ -387,58 +415,42 @@ func sendTags(bot *tgbotapi.BotAPI, UserID int64) {
 	bot.Send(msg)
 }
 
-func addTag(bot *tgbotapi.BotAPI, tag string, UserID int64) {
+func addTags(bot *tgbotapi.BotAPI, tag string, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	// if len(tags) > 0 {
 	tag = strings.Replace(tag, ".", "", -1)
 	if len(tag) > 0 {
-		if strings.Contains(tag, ", ") {
-			newTags := strings.Split(tag, ", ")
-			for _, tag := range newTags {
-				key := "tags." + tag
-				like := 20
-				if viper.IsSet(key + ".like") {
-					like = viper.GetInt(key + ".like")
-				}
-				viper.Set(key+".like", like)
-				comment := 2
-				if viper.IsSet(key + ".comment") {
-					comment = viper.GetInt(key + ".comment")
-				}
-				viper.Set(key+".comment", comment)
-				follow := 10
-				if viper.IsSet(key + ".follow") {
-					follow = viper.GetInt(key + ".follow")
-				}
-				viper.Set(key+".follow", follow)
-				// }
-			}
-			viper.WriteConfig()
-			msg.Text = "Tags added"
-		} else {
-			// 	for _, tag := range strings.Split(tags, ", ") {
-			key := "tags." + tag
-			like := 20
-			if viper.IsSet(key + ".like") {
-				like = viper.GetInt(key + ".like")
-			}
-			viper.Set(key+".like", like)
-			comment := 2
-			if viper.IsSet(key + ".comment") {
-				comment = viper.GetInt(key + ".comment")
-			}
-			viper.Set(key+".comment", comment)
-			follow := 10
-			if viper.IsSet(key + ".follow") {
-				follow = viper.GetInt(key + ".follow")
-			}
-			viper.Set(key+".follow", follow)
-			// }
-			viper.WriteConfig()
-			msg.Text = "Tag added"
-		}
+		newTags := strings.Split(tag, ", ")
+		newTags = append(tagsList, newTags...)
+		newTags = SliceUnique(newTags)
+		viper.Set("tags", newTags)
+		viper.WriteConfig()
+		msg.Text = "Tags added"
 	} else {
 		msg.Text = "Tag is empty"
+	}
+
+	bot.Send(msg)
+}
+
+func removeTags(bot *tgbotapi.BotAPI, tags string, UserID int64) {
+	msg := tgbotapi.NewMessage(UserID, "")
+	if len(tags) > 0 {
+		removeTags := strings.Split(tags, ", ")
+		var newTags []string
+		for _, tag := range tagsList {
+			if stringInStringSlice(tag, removeTags) {
+
+			} else {
+				newTags = append(newTags, tag)
+			}
+		}
+		newTags = SliceUnique(newTags)
+		viper.Set("tags", newTags)
+		viper.WriteConfig()
+		msg.Text = "Tags removed"
+	} else {
+		msg.Text = "Tags is empty"
 	}
 
 	bot.Send(msg)

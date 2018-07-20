@@ -58,7 +58,9 @@ Commands list for BotFather:
  - getcomments - список комментов для отправки
  - gettags - список тэгов для /follow
  - addcomments - добавить комменты (через ", ")
+ - removecomments - удалить комменты (через ", ")
  - addtags - добавить тэги (через ", ")
+ - removetags - удалить тэги (через ", ")
 
 There, in the 'dist/' folder, you will find a sample 'config.json', that you have to copy to the 'config/' folder :
 

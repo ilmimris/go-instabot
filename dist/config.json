@@ -20,29 +20,24 @@
         "maxRetry": 2,
         "like": {
             "min": 0,
+            "count": 20,
             "max": 10000
         },
         "comment": {
             "min": 100,
+            "count": 2,
             "max": 10000
         },
         "follow": {
             "min": 200,
+            "count": 10,
             "max": 10000
         }
     },
-    "tags": {
-        "dog": {
-            "like": 3,
-            "comment": 2,
-            "follow": 1
-        },
-        "cat": {
-            "like": 3,
-            "comment": 2,
-            "follow": 1
-        }
-    },
+    "tags": [
+        "dog",
+        "cat"
+    ],
     "comments": [
         "awesome",
         "wow",
