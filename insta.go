@@ -963,6 +963,7 @@ func likeFollowersPosts(db *bolt.DB) {
 		for _, item := range items {
 			// log.Println(item.ID, item.Caption, item.User.Username)
 			if !item.HasLiked {
+				time.Sleep(5 * time.Second)
 				insta.Like(item.ID)
 				incStats(db, "like")
 			}
