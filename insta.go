@@ -325,9 +325,9 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			if state["unfollow_current"] == 0 {
 				unfollowRes <- TelegramResponse{fmt.Sprintf("No one unfollow")}
 			} else {
+				unfollowRes <- TelegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", state["unfollow_current"])}
 				state["unfollow_current"] = 0
 				state["unfollow_all_count"] = 0
-				unfollowRes <- TelegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", state["unfollow_current"])}
 			}
 			return
 			//default:
