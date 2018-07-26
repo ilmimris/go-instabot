@@ -23,3 +23,6 @@ session
 go-instabot-ad
 instabot.db
 .DS_Store
+bin/
+pkg/
+vendor/src/
