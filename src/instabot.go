@@ -57,13 +57,13 @@ func main() {
 	go login()
 
 	startFollowChan, _, _, stopFollowChan := followManager(db)
-	followRes = make(chan TelegramResponse, 2)
+	followRes = make(chan TelegramResponse, 10)
 
 	startUnfollowChan, _, _, stopUnfollowChan := unfollowManager(db)
-	unfollowRes = make(chan TelegramResponse, 2)
+	unfollowRes = make(chan TelegramResponse, 10)
 
 	startRefollowChan, _, innerRefollowChan, stopRefollowChan := refollowManager(db)
-	followFollowersRes = make(chan TelegramResponse, 2)
+	followFollowersRes = make(chan TelegramResponse, 10)
 
 	bot, err := tgbotapi.NewBotAPI(telegramToken)
 	if err != nil {
