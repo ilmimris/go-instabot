@@ -22,3 +22,4 @@ session
 .glide/
 go-instabot-ad
 instabot.db
+.DS_Store
