@@ -25,3 +25,4 @@ instabot.db
 bin/
 pkg/
 vendor/
+go-instabot-ad

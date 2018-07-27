@@ -668,7 +668,10 @@ func followUser(tag string, db *bolt.DB, userInfo response.GetUsernameResponse) 
 				log.Printf("%s is private, skipping follow\n", user.Username)
 			} else {
 				log.Printf("Following %s\n", user.Username)
-				insta.Follow(user.ID)
+				_, err := insta.Follow(user.ID)
+				if err != nil {
+					log.Println(err)
+				}
 			}
 		}
 		// log.Println("Followed")
