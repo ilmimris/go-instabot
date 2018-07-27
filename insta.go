@@ -663,25 +663,34 @@ func followUser(tag string, db *bolt.DB, userInfo response.GetUsernameResponse) 
 	check(err)
 	// If not following already
 	if !userFriendShip.Following {
+
 		if !*dev {
 			if user.IsPrivate {
 				log.Printf("%s is private, skipping follow\n", user.Username)
 			} else {
 				log.Printf("Following %s\n", user.Username)
-				_, err := insta.Follow(user.ID)
+				resp, err := insta.Follow(user.ID)
 				if err != nil {
 					log.Println(err)
+				} else {
+					userFriendShip.Following = resp.FriendShipStatus.Following
+
+					if !userFriendShip.Following {
+						log.Println("Not followed")
+					}
 				}
 			}
 		}
 		// log.Println("Followed")
-		numFollowed++
-		if _, ok := report[tag]; !ok {
-			report[tag] = make(map[string]int)
+		if userFriendShip.Following {
+			numFollowed++
+			if _, ok := report[tag]; !ok {
+				report[tag] = make(map[string]int)
+			}
+			report[tag]["follow"]++
+			incStats(db, "follow")
+			setFollowed(db, user.Username)
 		}
-		report[tag]["follow"]++
-		incStats(db, "follow")
-		setFollowed(db, user.Username)
 	} else {
 		log.Println("Already following " + user.Username)
 	}
