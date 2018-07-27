@@ -36,12 +36,8 @@ The first time it logs you in, it will store the session object in a file, encry
 
 2. Download and install go-instabot, by executing this command in your terminal / cmd :
 
-    `go get github.com/ad/go-instabot`
-    `go get github.com/constabulary/gb/...`
-    `cd ~/go/src/github.com/ad/go-instabot/`
-    `gb vendor restore`
-    `gb build`
-    `~/go/src/github.com/ad/go-instabot/bin/main`
+    `brew install dep`
+    `go get -u github.com/ad/go-instabot`
 
 ## Configuration
 ### Config.json

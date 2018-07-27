@@ -24,4 +24,4 @@ instabot.db
 .DS_Store
 bin/
 pkg/
-vendor/src/
+vendor/
