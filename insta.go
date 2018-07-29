@@ -567,21 +567,25 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 
 		poster := posterInfo.User
 		followerCount := poster.FollowerCount
+		likesCount := image.LikeCount
+		commentsCount := image.CommentCount
 
 		// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
 		if followerCount < likeLowerLimit && followerCount < likeUpperLimit {
 			log.Printf("%s has %d followers, less than min %d\n", poster.Username, followerCount, likeLowerLimit)
-		} else if followerCount > likeUpperLimit {
-			log.Printf("%s has %d followers, more than max %d\n", poster.Username, followerCount, likeUpperLimit)
+		} else if likesCount > likeUpperLimit {
+			log.Printf("%s has %d likes, more than max %d\n", poster.Username, likesCount, likeUpperLimit)
+		} else if commentsCount > likeUpperLimit {
+			log.Printf("%s has %d comments, more than max %d\n", poster.Username, commentsCount, likeUpperLimit)
 		} else {
 			log.Printf("%s has %d followers\n", poster.Username, followerCount)
 		}
 		i++
 
 		// Will only follow and comment if we like the picture
-		like := followerCount > likeLowerLimit && followerCount < likeUpperLimit && numLiked < likeCount
+		like := likesCount > likeLowerLimit && likesCount < likeUpperLimit && numLiked < likeCount
 		follow := followerCount > followLowerLimit && followerCount < followUpperLimit && numFollowed < followCount && like
-		comment := followerCount > commentLowerLimit && followerCount < commentUpperLimit && numCommented < commentCount && like
+		comment := commentsCount > commentLowerLimit && commentsCount < commentUpperLimit && numCommented < commentCount && like
 
 		// Like, then comment/follow
 		if like {
