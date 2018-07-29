@@ -578,15 +578,19 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
 		if followerCount < likeLowerLimit && followerCount < likeUpperLimit {
 			log.Printf("%s has %d followers, less than min %d\n", poster.Username, followerCount, likeLowerLimit)
-		} else if likesCount > likeUpperLimit {
+		}
+
+		if likesCount > likeUpperLimit {
 			log.Printf("%s has %d likes, more than max %d\n", poster.Username, likesCount, likeUpperLimit)
-		} else if commentsCount > likeUpperLimit {
+		}
+
+		if commentsCount > likeUpperLimit {
 			log.Printf("%s has %d comments, more than max %d\n", poster.Username, commentsCount, likeUpperLimit)
-		} else {
-			log.Printf("%s has %d followers\n", poster.Username, followerCount)
 		}
 
 		if like || comment || follow {
+			log.Printf("%s has %d followers\n", poster.Username, followerCount)
+
 			i++
 			// Like, then comment/follow
 			if like {
