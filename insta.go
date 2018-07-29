@@ -432,6 +432,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				if allCount > 0 {
 					var current = 0
 
+					Shuffle(tagsList)
 					for _, tag := range tagsList {
 						if !followIsStarted.IsSet() {
 							stopChan <- true
