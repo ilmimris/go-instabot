@@ -571,21 +571,33 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		commentsCount := image.CommentCount
 
 		// Will only follow and comment if we like the picture
-		like := likesCount > likeLowerLimit && likesCount < likeUpperLimit && numLiked < likeCount
-		follow := followerCount > followLowerLimit && followerCount < followUpperLimit && numFollowed < followCount && like
-		comment := commentsCount > commentLowerLimit && commentsCount < commentUpperLimit && numCommented < commentCount && like
+		like := numLiked < likeCount
+		follow := numFollowed < followCount && like
+		comment := numCommented < commentCount && like
 
 		// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
-		if followerCount < likeLowerLimit && followerCount < likeUpperLimit {
-			log.Printf("%s has %d followers, less than min %d\n", poster.Username, followerCount, likeLowerLimit)
+		if followerCount > followUpperLimit {
+			log.Printf("%s has %d followers, more than max %d\n", poster.Username, followerCount, followUpperLimit)
+			follow = false
+		} else if followerCount < followLowerLimit {
+			log.Printf("%s has %d followers, less than min %d\n", poster.Username, followerCount, followLowerLimit)
+			follow = false
 		}
 
 		if likesCount > likeUpperLimit {
-			log.Printf("%s has %d likes, more than max %d\n", poster.Username, likesCount, likeUpperLimit)
+			log.Printf("%s's image has %d likes, more than max %d\n", poster.Username, likesCount, likeUpperLimit)
+			like = false
+		} else if likesCount < likeLowerLimit {
+			log.Printf("%s's image has %d likes, less than min %d\n", poster.Username, likesCount, likeLowerLimit)
+			like = false
 		}
 
-		if commentsCount > likeUpperLimit {
-			log.Printf("%s has %d comments, more than max %d\n", poster.Username, commentsCount, likeUpperLimit)
+		if commentsCount > commentUpperLimit {
+			log.Printf("%s's image has %d comments, more than max %d\n", poster.Username, commentsCount, commentUpperLimit)
+			comment = false
+		} else if commentsCount < commentLowerLimit {
+			log.Printf("%s's image has %d comments, less than min %d\n", poster.Username, commentsCount, commentLowerLimit)
+			comment = false
 		}
 
 		if like || comment || follow {
