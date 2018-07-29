@@ -462,6 +462,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						text := fmt.Sprintf("\n[%d/%d] ➜ Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
 						followRes <- TelegramResponse{text}
 						browse(tag, db, stopChan)
+						time.Sleep(10 * time.Second)
 					}
 				}
 
@@ -633,7 +634,7 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 				}
 
 				// This is to avoid the temporary ban by Instagram
-				time.Sleep(20 * time.Second)
+				time.Sleep(30 * time.Second)
 			}
 		} else {
 			log.Printf("%s, nothing to do\n", poster.Username)
