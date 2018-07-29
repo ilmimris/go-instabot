@@ -207,7 +207,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				// check(err)
 
 				var daysBeforeUnfollow = viper.GetInt("limits.daysBeforeUnfollow")
-				if daysBeforeUnfollow <= 1 || daysBeforeUnfollow >= 14 {
+				if daysBeforeUnfollow <= 0 || daysBeforeUnfollow >= 30 {
 					daysBeforeUnfollow = 3
 				}
 
@@ -309,7 +309,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 							insta.UnFollow(user.ID)
 							setFollowed(db, user.Username)
 							incStats(db, "unfollow")
-							time.Sleep(10 * time.Second)
+							time.Sleep(60 * time.Second)
 						} else {
 							time.Sleep(2 * time.Second)
 						}
