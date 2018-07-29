@@ -100,26 +100,28 @@ func main() {
 			if intInStringSlice(int(update.Message.From.ID), admins) {
 				// ChatID := update.Message.Chat.ID
 
-				Text := update.Message.Text
-				Command := update.Message.Command()
-				Args := update.Message.CommandArguments()
+				text := update.Message.Text
+				command := update.Message.Command()
+				args := update.Message.CommandArguments()
 
 				// log.Printf("[%d] %s, %s, %s", UserID, Text, Command, Args)
 
 				msg := tgbotapi.NewMessage(int64(update.Message.From.ID), "")
 
-				if Command == "refollow" {
-					if Args == "" {
+				switch command {
+
+				case "refollow":
+					if args == "" {
 						msg.Text = fmt.Sprintf("/refollow username")
 						bot.Send(msg)
 					} else {
-						startRefollow(bot, startRefollowChan, innerRefollowChan, int64(update.Message.From.ID), Args)
+						startRefollow(bot, startRefollowChan, innerRefollowChan, int64(update.Message.From.ID), args)
 					}
-				} else if Command == "follow" {
+				case "follow":
 					startFollow(bot, startFollowChan, int64(update.Message.From.ID))
-				} else if Command == "unfollow" {
+				case "unfollow":
 					startUnfollow(bot, startUnfollowChan, int64(update.Message.From.ID))
-				} else if Command == "progress" {
+				case "progress":
 					var unfollowProgress = "not started"
 					if state["unfollow"] >= 0 {
 						unfollowProgress = fmt.Sprintf("%d%% [%d/%d]", state["unfollow"], state["unfollow_current"], state["unfollow_all_count"])
@@ -137,43 +139,43 @@ func main() {
 					if err != nil {
 						editMessage["progress"][update.Message.From.ID] = msgRes.MessageID
 					}
-				} else if Command == "cancelfollow" {
+				case "cancelfollow":
 					if followIsStarted.IsSet() {
 						stopFollowChan <- true
 						// followRes <- TelegramResponse{"Following canceled"}
 					}
-				} else if Command == "cancelunfollow" {
+				case "cancelunfollow":
 					if unfollowIsStarted.IsSet() {
 						stopUnfollowChan <- true
 						// unfollowRes <- TelegramResponse{"Unfollowing canceled"}
 					}
-				} else if Command == "cancelrefollow" {
+				case "cancelrefollow":
 					if refollowIsStarted.IsSet() {
 						stopRefollowChan <- true
 						// followFollowersRes <- TelegramResponse{"Refollowing canceled"}
 					}
-				} else if Command == "stats" {
+				case "stats":
 					sendStats(bot, db, int64(update.Message.From.ID))
-				} else if Command == "getcomments" {
+				case "getcomments":
 					sendComments(bot, int64(update.Message.From.ID))
-				} else if Command == "addcomments" {
-					addComments(bot, Args, int64(update.Message.From.ID))
-				} else if Command == "removecomments" {
-					removeComments(bot, Args, int64(update.Message.From.ID))
-				} else if Command == "gettags" {
+				case "addcomments":
+					addComments(bot, args, int64(update.Message.From.ID))
+				case "removecomments":
+					removeComments(bot, args, int64(update.Message.From.ID))
+				case "gettags":
 					sendTags(bot, int64(update.Message.From.ID))
-				} else if Command == "addtags" {
-					addTags(bot, Args, int64(update.Message.From.ID))
-				} else if Command == "removetags" {
-					removeTags(bot, Args, int64(update.Message.From.ID))
-				} else if Command == "getlimits" {
+				case "addtags":
+					addTags(bot, args, int64(update.Message.From.ID))
+				case "removetags":
+					removeTags(bot, args, int64(update.Message.From.ID))
+				case "getlimits":
 					getLimits(bot, int64(update.Message.From.ID))
-				} else if Command == "updatelimits" {
-					updateLimits(bot, Args, int64(update.Message.From.ID))
-				} else if Command == "like" {
+				case "updatelimits":
+					updateLimits(bot, args, int64(update.Message.From.ID))
+				case "like":
 					likeFollowersPosts(db)
-				} else if Text != "" {
-					msg.Text = Text
+				default:
+					msg.Text = text
 					msg.ReplyMarkup = commandKeyboard
 					bot.Send(msg)
 				}

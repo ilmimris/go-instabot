@@ -228,8 +228,8 @@ func getInput(text string) string {
 
 // Checks if the user is in the slice
 func contains(slice []response.User, user response.User) bool {
-	for _, currentUser := range slice {
-		if currentUser == user {
+	for index := range slice {
+		if user == slice[index] {
 			return true
 		}
 	}

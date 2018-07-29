@@ -34,7 +34,7 @@ func login() {
 	}
 }
 
-func refollowManager(db *bolt.DB) (startChan chan bool, outerChan chan string, innerChan chan string, stopChan chan bool) {
+func refollowManager(db *bolt.DB) (startChan chan bool, outerChan, innerChan chan string, stopChan chan bool) {
 	startChan = make(chan bool)
 	outerChan = make(chan string)
 	innerChan = make(chan string)
@@ -106,16 +106,17 @@ func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 					}
 
 					var allCount = int(math.Min(float64(len(users)), float64(limit)))
-					if allCount == 0 && len(users) > 0 {
+					switch {
+					case allCount == 0 && len(users) > 0:
 						followFollowersRes <- TelegramResponse{"Follow limit reached :("}
-					} else if allCount <= 0 {
+					case allCount <= 0:
 						followFollowersRes <- TelegramResponse{"Followers not found :("}
-					} else {
+					default:
 						var current = 0
 
 						followFollowersRes <- TelegramResponse{fmt.Sprintf("%d users will be followed", allCount)}
 
-						for _, user := range users {
+						for index := range users {
 							if !refollowIsStarted.IsSet() {
 								stopChan <- true
 								return
@@ -124,24 +125,24 @@ func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 								continue
 							}
 
-							if user.IsPrivate {
-								log.Printf("%s is private, skipping\n", user.Username)
+							if users[index].IsPrivate {
+								log.Printf("%s is private, skipping\n", users[index].Username)
 							} else {
-								previoslyFollowed, _ := getFollowed(db, user.Username)
+								previoslyFollowed, _ := getFollowed(db, users[index].Username)
 								if previoslyFollowed != "" {
-									log.Printf("%s previously followed at %s, skipping\n", user.Username, previoslyFollowed)
+									log.Printf("%s previously followed at %s, skipping\n", users[index].Username, previoslyFollowed)
 								} else {
 									current++
 									state["refollow"] = int(current * 100 / allCount)
 									state["refollow_current"] = current
 									state["refollow_all_count"] = allCount
 
-									text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)", state["refollow_current"], state["refollow_all_count"], user.Username, state["refollow"])
+									text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)", state["refollow_current"], state["refollow_all_count"], users[index].Username, state["refollow"])
 									followFollowersRes <- TelegramResponse{text}
 
 									if !*dev {
-										insta.Follow(user.ID)
-										setFollowed(db, user.Username)
+										insta.Follow(users[index].ID)
+										setFollowed(db, users[index].Username)
 										incStats(db, "follow")
 										incStats(db, "refollow")
 										time.Sleep(10 * time.Second)
@@ -166,7 +167,7 @@ func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 	}
 }
 
-func unfollowManager(db *bolt.DB) (startChan chan bool, outerChan chan string, innerChan chan string, stopChan chan bool) {
+func unfollowManager(db *bolt.DB) (startChan chan bool, outerChan, innerChan chan string, stopChan chan bool) {
 	startChan = make(chan bool)
 	outerChan = make(chan string)
 	innerChan = make(chan string)
@@ -212,9 +213,9 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				}
 
 				var users []response.User
-				for _, user := range following.Users {
-					if !contains(followers.Users, user) {
-						previoslyFollowed, _ := getFollowed(db, user.Username)
+				for index := range following.Users {
+					if !contains(followers.Users, following.Users[index]) {
+						previoslyFollowed, _ := getFollowed(db, following.Users[index].Username)
 						if previoslyFollowed != "" {
 							t, err := time.Parse("20060102", previoslyFollowed)
 
@@ -223,14 +224,14 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 							} else {
 								duration := time.Since(t)
 								if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
-									fmt.Printf("%s not followed us less then %f hours, skipping!\n", user.Username, duration.Hours())
+									fmt.Printf("%s not followed us less then %f hours, skipping!\n", following.Users[index].Username, duration.Hours())
 									continue
 								} else {
-									users = append(users, user)
+									users = append(users, following.Users[index])
 								}
 							}
 						} else {
-							users = append(users, user)
+							users = append(users, following.Users[index])
 						}
 					}
 				}
@@ -240,15 +241,15 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 					if len(following.Users) > 0 {
 						unfollowRes <- TelegramResponse{fmt.Sprintf("Found %d following, %d likers for last 10 posts\n", len(following.Users), len(lastLikers))}
 						var notLikers []response.User
-						for _, user := range following.Users {
-							if !stringInStringSlice(user.Username, lastLikers) {
-								notLikers = append(notLikers, user)
+						for index := range following.Users {
+							if !stringInStringSlice(following.Users[index].Username, lastLikers) {
+								notLikers = append(notLikers, following.Users[index])
 							}
 						}
 
 						if len(notLikers) > 0 {
-							for _, user := range notLikers {
-								previoslyFollowed, _ := getFollowed(db, user.Username)
+							for index := range notLikers {
+								previoslyFollowed, _ := getFollowed(db, notLikers[index].Username)
 								if previoslyFollowed != "" {
 									t, err := time.Parse("20060102", previoslyFollowed)
 
@@ -259,14 +260,14 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 										if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
 
 										} else {
-											if !contains(users, user) {
-												users = append(users, user)
+											if !contains(users, notLikers[index]) {
+												users = append(users, notLikers[index])
 											}
 										}
 									}
 								} else {
-									if !contains(users, user) {
-										users = append(users, user)
+									if !contains(users, notLikers[index]) {
+										users = append(users, notLikers[index])
 									}
 								}
 							}
@@ -289,7 +290,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				if allCount > 0 {
 					unfollowRes <- TelegramResponse{fmt.Sprintf("%d will be unfollowed", allCount)}
 
-					for _, user := range users {
+					for index := range users {
 						if !unfollowIsStarted.IsSet() {
 							stopChan <- true
 							return
@@ -304,10 +305,10 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						state["unfollow_current"] = current
 						state["unfollow_all_count"] = allCount
 
-						unfollowRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])}
+						unfollowRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], users[index].Username, state["unfollow"])}
 						if !*dev {
-							insta.UnFollow(user.ID)
-							setFollowed(db, user.Username)
+							insta.UnFollow(users[index].ID)
+							setFollowed(db, users[index].Username)
 							incStats(db, "unfollow")
 							time.Sleep(60 * time.Second)
 						} else {
@@ -384,7 +385,7 @@ func createKey() []byte {
 	return key
 }
 
-func followManager(db *bolt.DB) (startChan chan bool, outerChan chan string, innerChan chan string, stopChan chan bool) {
+func followManager(db *bolt.DB) (startChan chan bool, outerChan, innerChan chan string, stopChan chan bool) {
 	startChan = make(chan bool)
 	outerChan = make(chan string)
 	innerChan = make(chan string)
@@ -530,7 +531,7 @@ func browse(tag string, db *bolt.DB, stopChan chan bool) {
 // Goes through all the images for a certain tag
 func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopChan chan bool) {
 	var i = 1
-	for _, image := range images.FeedsResponse.Items {
+	for index := range images.FeedsResponse.Items {
 		if !followIsStarted.IsSet() {
 			stopChan <- true
 			return
@@ -541,7 +542,7 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		}
 
 		// Skip our own images
-		if image.User.Username == instaUsername {
+		if images.FeedsResponse.Items[index].User.Username == instaUsername {
 			continue
 		}
 
@@ -553,14 +554,14 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		// Getting the user info
 		// Instagram will return a 500 sometimes, so we will retry 10 times.
 		// Check retry() for more info.
-		var posterInfo, ok = usersInfo[image.User.Username]
+		var posterInfo, ok = usersInfo[images.FeedsResponse.Items[index].User.Username]
 		if ok {
 			// log.Println("from cache " + posterInfo.User.Username + " - for #" + tag)
 		} else {
 			err := retry(10, 20*time.Second, func() (err error) {
-				posterInfo, err = insta.GetUserByID(image.User.ID)
+				posterInfo, err = insta.GetUserByID(images.FeedsResponse.Items[index].User.ID)
 				if err == nil {
-					usersInfo[image.User.Username] = posterInfo
+					usersInfo[images.FeedsResponse.Items[index].User.Username] = posterInfo
 				}
 				return
 			})
@@ -569,11 +570,11 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 
 		poster := posterInfo.User
 		followerCount := poster.FollowerCount
-		likesCount := image.LikeCount
-		commentsCount := image.CommentCount
+		likesCount := images.FeedsResponse.Items[index].LikeCount
+		commentsCount := images.FeedsResponse.Items[index].CommentCount
 
 		// Will only follow and comment if we like the picture
-		like := numLiked < likeCount && !image.HasLiked
+		like := numLiked < likeCount && !images.FeedsResponse.Items[index].HasLiked
 		follow := numFollowed < followCount && like
 		comment := numCommented < commentCount && like
 
@@ -610,13 +611,13 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 			if like {
 				if userLikesCount, ok := likesToAccountPerSession[posterInfo.User.Username]; ok {
 					if userLikesCount < maxLikesToAccountPerSession {
-						likeImage(tag, db, image, posterInfo)
-						image.HasLiked = true
+						likeImage(tag, db, images.FeedsResponse.Items[index], posterInfo)
+						images.FeedsResponse.Items[index].HasLiked = true
 					} else {
 						log.Println("Likes count per user reached [" + poster.Username + "]")
 					}
 				} else {
-					likeImage(tag, db, image, posterInfo)
+					likeImage(tag, db, images.FeedsResponse.Items[index], posterInfo)
 				}
 
 				previoslyFollowed, _ := getFollowed(db, posterInfo.User.Username)
@@ -624,8 +625,8 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 					log.Printf("%s already following (%s), skipping\n", posterInfo.User.Username, previoslyFollowed)
 				} else {
 					if comment {
-						if !image.HasLiked {
-							commentImage(tag, db, image)
+						if !images.FeedsResponse.Items[index].HasLiked {
+							commentImage(tag, db, images.FeedsResponse.Items[index])
 						}
 					}
 					if follow {
@@ -722,11 +723,11 @@ func followUser(tag string, db *bolt.DB, userInfo response.GetUsernameResponse) 
 	}
 }
 
-func startFollow(bot *tgbotapi.BotAPI, startChan chan bool, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func startFollow(bot *tgbotapi.BotAPI, startChan chan bool, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 	if followIsStarted.IsSet() {
 		msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
-		if len(editMessage["follow"]) > 0 && intInStringSlice(int(UserID), GetKeys(editMessage["follow"])) {
+		if len(editMessage["follow"]) > 0 && intInStringSlice(int(userID), GetKeys(editMessage["follow"])) {
 			for UserID, EditID := range editMessage["follow"] {
 				edit := tgbotapi.EditMessageTextConfig{
 					BaseEdit: tgbotapi.BaseEdit{
@@ -740,7 +741,7 @@ func startFollow(bot *tgbotapi.BotAPI, startChan chan bool, UserID int64) {
 		} else {
 			msgRes, err := bot.Send(msg)
 			if err == nil {
-				editMessage["follow"][int(UserID)] = msgRes.MessageID
+				editMessage["follow"][int(userID)] = msgRes.MessageID
 			}
 		}
 	} else {
@@ -748,16 +749,16 @@ func startFollow(bot *tgbotapi.BotAPI, startChan chan bool, UserID int64) {
 		msg.Text = "Starting follow"
 		msgRes, err := bot.Send(msg)
 		if err == nil {
-			editMessage["follow"][int(UserID)] = msgRes.MessageID
+			editMessage["follow"][int(userID)] = msgRes.MessageID
 		}
 	}
 }
 
-func startUnfollow(bot *tgbotapi.BotAPI, startChan chan bool, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func startUnfollow(bot *tgbotapi.BotAPI, startChan chan bool, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 	if unfollowIsStarted.IsSet() {
 		msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
-		if len(editMessage["unfollow"]) > 0 && intInStringSlice(int(UserID), GetKeys(editMessage["unfollow"])) {
+		if len(editMessage["unfollow"]) > 0 && intInStringSlice(int(userID), GetKeys(editMessage["unfollow"])) {
 			for UserID, EditID := range editMessage["unfollow"] {
 				edit := tgbotapi.EditMessageTextConfig{
 					BaseEdit: tgbotapi.BaseEdit{
@@ -772,7 +773,7 @@ func startUnfollow(bot *tgbotapi.BotAPI, startChan chan bool, UserID int64) {
 			msgRes, err := bot.Send(msg)
 			if err == nil {
 				// log.Print(msgRes, msgRes.MessageID)
-				editMessage["unfollow"][int(UserID)] = msgRes.MessageID
+				editMessage["unfollow"][int(userID)] = msgRes.MessageID
 			}
 		}
 	} else {
@@ -781,20 +782,20 @@ func startUnfollow(bot *tgbotapi.BotAPI, startChan chan bool, UserID int64) {
 		fmt.Println(msg.Text)
 		msgRes, err := bot.Send(msg)
 		if err == nil {
-			editMessage["unfollow"][int(UserID)] = msgRes.MessageID
+			editMessage["unfollow"][int(userID)] = msgRes.MessageID
 		}
 	}
 }
 
-func startRefollow(bot *tgbotapi.BotAPI, startChan chan bool, innerRefollowChan chan string, UserID int64, target string) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func startRefollow(bot *tgbotapi.BotAPI, startChan chan bool, innerRefollowChan chan string, userID int64, target string) {
+	msg := tgbotapi.NewMessage(userID, "")
 	if refollowIsStarted.IsSet() {
 		msg.Text = fmt.Sprintf("Refollow in progress (%d%%)", state["refollow"])
-		if len(editMessage["refollow"]) > 0 && intInStringSlice(int(UserID), GetKeys(editMessage["refollow"])) {
+		if len(editMessage["refollow"]) > 0 && intInStringSlice(int(userID), GetKeys(editMessage["refollow"])) {
 			edit := tgbotapi.EditMessageTextConfig{
 				BaseEdit: tgbotapi.BaseEdit{
-					ChatID:    int64(UserID),
-					MessageID: editMessage["refollow"][int(UserID)],
+					ChatID:    int64(userID),
+					MessageID: editMessage["refollow"][int(userID)],
 				},
 				Text: msg.Text,
 			}
@@ -802,7 +803,7 @@ func startRefollow(bot *tgbotapi.BotAPI, startChan chan bool, innerRefollowChan 
 		} else {
 			msgRes, err := bot.Send(msg)
 			if err == nil {
-				editMessage["refollow"][int(UserID)] = msgRes.MessageID
+				editMessage["refollow"][int(userID)] = msgRes.MessageID
 			}
 		}
 	} else {
@@ -810,14 +811,14 @@ func startRefollow(bot *tgbotapi.BotAPI, startChan chan bool, innerRefollowChan 
 		msg.Text = "Starting refollow"
 		msgRes, err := bot.Send(msg)
 		if err == nil {
-			editMessage["refollow"][int(UserID)] = msgRes.MessageID
+			editMessage["refollow"][int(userID)] = msgRes.MessageID
 		}
 		innerRefollowChan <- target
 	}
 }
 
-func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 	unfollowCount, _ := getStats(db, "unfollow")
 	followCount, _ := getStats(db, "follow")
 	refollowCount, _ := getStats(db, "refollow")
@@ -825,10 +826,10 @@ func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, UserID int64) {
 	commentCount, _ := getStats(db, "comment")
 	if unfollowCount > 0 || followCount > 0 || refollowCount > 0 || likeCount > 0 || commentCount > 0 {
 		msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nRefollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, refollowCount, likeCount, commentCount)
-		if UserID == -1 {
+		if userID == -1 {
 			for _, id := range admins {
-				UserID, _ = strconv.ParseInt(id, 10, 64)
-				msg.ChatID = UserID
+				userID, _ = strconv.ParseInt(id, 10, 64)
+				msg.ChatID = userID
 				bot.Send(msg)
 			}
 		} else {
@@ -837,8 +838,8 @@ func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, UserID int64) {
 	}
 }
 
-func sendComments(bot *tgbotapi.BotAPI, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func sendComments(bot *tgbotapi.BotAPI, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 	if len(commentsList) > 0 {
 		msg.Text = strings.Join(commentsList, ", ")
 	} else {
@@ -848,8 +849,8 @@ func sendComments(bot *tgbotapi.BotAPI, UserID int64) {
 	bot.Send(msg)
 }
 
-func addComments(bot *tgbotapi.BotAPI, comments string, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func addComments(bot *tgbotapi.BotAPI, comments string, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 	if len(comments) > 0 {
 		newComments := strings.Split(comments, ", ")
 		newComments = append(commentsList, newComments...)
@@ -864,8 +865,8 @@ func addComments(bot *tgbotapi.BotAPI, comments string, UserID int64) {
 	bot.Send(msg)
 }
 
-func removeComments(bot *tgbotapi.BotAPI, comments string, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func removeComments(bot *tgbotapi.BotAPI, comments string, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 	if len(comments) > 0 {
 		removeComments := strings.Split(comments, ", ")
 		var newComments []string
@@ -887,8 +888,8 @@ func removeComments(bot *tgbotapi.BotAPI, comments string, UserID int64) {
 	bot.Send(msg)
 }
 
-func sendTags(bot *tgbotapi.BotAPI, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func sendTags(bot *tgbotapi.BotAPI, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 	if len(tagsList) > 0 {
 		// keys := GetKeys(tagsList)
 		// msg.Text = strings.Join(keys, ", ")
@@ -900,8 +901,8 @@ func sendTags(bot *tgbotapi.BotAPI, UserID int64) {
 	bot.Send(msg)
 }
 
-func addTags(bot *tgbotapi.BotAPI, tag string, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func addTags(bot *tgbotapi.BotAPI, tag string, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 	// if len(tags) > 0 {
 	tag = strings.Replace(tag, ".", "", -1)
 	if len(tag) > 0 {
@@ -918,8 +919,8 @@ func addTags(bot *tgbotapi.BotAPI, tag string, UserID int64) {
 	bot.Send(msg)
 }
 
-func removeTags(bot *tgbotapi.BotAPI, tags string, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func removeTags(bot *tgbotapi.BotAPI, tags string, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 	if len(tags) > 0 {
 		removeTags := strings.Split(tags, ", ")
 		var newTags []string
@@ -941,8 +942,8 @@ func removeTags(bot *tgbotapi.BotAPI, tags string, UserID int64) {
 	bot.Send(msg)
 }
 
-func getLimits(bot *tgbotapi.BotAPI, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func getLimits(bot *tgbotapi.BotAPI, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 
 	limits := []string{"maxSync", "daysBeforeUnfollow", "max_likes_to_account_per_session", "maxRetry", "like.min", "like.count", "like.max", "follow.min", "follow.count", "follow.max", "comment.min", "comment.count", "comment.max"}
 	for _, limit := range limits {
@@ -952,8 +953,8 @@ func getLimits(bot *tgbotapi.BotAPI, UserID int64) {
 	bot.Send(msg)
 }
 
-func updateLimits(bot *tgbotapi.BotAPI, limitStr string, UserID int64) {
-	msg := tgbotapi.NewMessage(UserID, "")
+func updateLimits(bot *tgbotapi.BotAPI, limitStr string, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
 	s := strings.Split(limitStr, " ")
 	limits := []string{"maxSync", "daysBeforeUnfollow", "max_likes_to_account_per_session", "maxRetry", "like.min", "like.count", "like.max", "follow.min", "follow.count", "follow.max", "comment.min", "comment.count", "comment.max"}
 	if len(s) != 2 {
@@ -980,14 +981,14 @@ func updateLimits(bot *tgbotapi.BotAPI, limitStr string, UserID int64) {
 func getLastLikers() (result []string) {
 	latest, _ := insta.LatestFeed()
 	l := latest.Items[0:10] //last 10 posts
-	for _, item := range l {
+	for lindex := range l {
 		// log.Println(item.ID, item.HasLiked, item.LikeCount)
-		if item.LikeCount > 0 {
-			likers, _ := insta.MediaLikers(item.ID)
-			for _, liker := range likers.Users {
+		if l[lindex].LikeCount > 0 {
+			likers, _ := insta.MediaLikers(l[lindex].ID)
+			for index := range likers.Users {
 				// log.Println(liker.Username, liker.HasAnonymousProfilePicture)
-				if !stringInStringSlice(liker.Username, result) {
-					result = append(result, liker.Username)
+				if !stringInStringSlice(likers.Users[index].Username, result) {
+					result = append(result, likers.Users[index].Username)
 				}
 			}
 		}
@@ -1007,14 +1008,14 @@ func likeFollowersPosts(db *bolt.DB) {
 
 	if length > 0 {
 		items := timeline.Items[0:length]
-		for _, item := range items {
+		for index := range items {
 			// log.Println(item.ID, item.Caption, item.User.Username)
-			if !item.HasLiked {
+			if !items[index].HasLiked {
 				time.Sleep(5 * time.Second)
-				insta.Like(item.ID)
+				insta.Like(items[index].ID)
 				incStats(db, "like")
 
-				usernames = append(usernames, item.User.Username)
+				usernames = append(usernames, items[index].User.Username)
 			}
 		}
 		length = len(usernames)
