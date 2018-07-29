@@ -571,7 +571,7 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		commentsCount := image.CommentCount
 
 		// Will only follow and comment if we like the picture
-		like := numLiked < likeCount
+		like := numLiked < likeCount && !image.HasLiked
 		follow := numFollowed < followCount && like
 		comment := numCommented < commentCount && like
 
