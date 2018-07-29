@@ -570,6 +570,11 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		likesCount := image.LikeCount
 		commentsCount := image.CommentCount
 
+		// Will only follow and comment if we like the picture
+		like := likesCount > likeLowerLimit && likesCount < likeUpperLimit && numLiked < likeCount
+		follow := followerCount > followLowerLimit && followerCount < followUpperLimit && numFollowed < followCount && like
+		comment := commentsCount > commentLowerLimit && commentsCount < commentUpperLimit && numCommented < commentCount && like
+
 		// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
 		if followerCount < likeLowerLimit && followerCount < likeUpperLimit {
 			log.Printf("%s has %d followers, less than min %d\n", poster.Username, followerCount, likeLowerLimit)
@@ -580,42 +585,41 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		} else {
 			log.Printf("%s has %d followers\n", poster.Username, followerCount)
 		}
-		i++
 
-		// Will only follow and comment if we like the picture
-		like := likesCount > likeLowerLimit && likesCount < likeUpperLimit && numLiked < likeCount
-		follow := followerCount > followLowerLimit && followerCount < followUpperLimit && numFollowed < followCount && like
-		comment := commentsCount > commentLowerLimit && commentsCount < commentUpperLimit && numCommented < commentCount && like
-
-		// Like, then comment/follow
-		if like {
-			if userLikesCount, ok := likesToAccountPerSession[posterInfo.User.Username]; ok {
-				if userLikesCount < maxLikesToAccountPerSession {
-					likeImage(tag, db, image, posterInfo)
-					image.HasLiked = true
+		if like || comment || follow {
+			i++
+			// Like, then comment/follow
+			if like {
+				if userLikesCount, ok := likesToAccountPerSession[posterInfo.User.Username]; ok {
+					if userLikesCount < maxLikesToAccountPerSession {
+						likeImage(tag, db, image, posterInfo)
+						image.HasLiked = true
+					} else {
+						log.Println("Likes count per user reached [" + poster.Username + "]")
+					}
 				} else {
-					log.Println("Likes count per user reached [" + poster.Username + "]")
+					likeImage(tag, db, image, posterInfo)
 				}
-			} else {
-				likeImage(tag, db, image, posterInfo)
-			}
 
-			previoslyFollowed, _ := getFollowed(db, posterInfo.User.Username)
-			if previoslyFollowed != "" {
-				log.Printf("%s already following (%s), skipping\n", posterInfo.User.Username, previoslyFollowed)
-			} else {
-				if comment {
-					if !image.HasLiked {
-						commentImage(tag, db, image)
+				previoslyFollowed, _ := getFollowed(db, posterInfo.User.Username)
+				if previoslyFollowed != "" {
+					log.Printf("%s already following (%s), skipping\n", posterInfo.User.Username, previoslyFollowed)
+				} else {
+					if comment {
+						if !image.HasLiked {
+							commentImage(tag, db, image)
+						}
+					}
+					if follow {
+						followUser(tag, db, posterInfo)
 					}
 				}
-				if follow {
-					followUser(tag, db, posterInfo)
-				}
-			}
 
-			// This is to avoid the temporary ban by Instagram
-			time.Sleep(20 * time.Second)
+				// This is to avoid the temporary ban by Instagram
+				time.Sleep(20 * time.Second)
+			}
+		} else {
+			log.Printf("%s, nothing to do\n", poster.Username)
 		}
 		// log.Printf("%s done\n\n", poster.Username)
 	}
