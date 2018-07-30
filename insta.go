@@ -825,7 +825,8 @@ func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, userID int64) {
 	likeCount, _ := getStats(db, "like")
 	commentCount, _ := getStats(db, "comment")
 	if unfollowCount > 0 || followCount > 0 || refollowCount > 0 || likeCount > 0 || commentCount > 0 {
-		msg.Text = fmt.Sprintf("Unfollowed: %d\nFollowed: %d\nRefollowed: %d\nLiked: %d\nCommented: %d", unfollowCount, followCount, refollowCount, likeCount, commentCount)
+		stats := getStatus()
+		msg.Text = fmt.Sprintf("%s\nUnfollowed: %d\nFollowed: %d\nRefollowed: %d\nLiked: %d\nCommented: %d", stats, unfollowCount, followCount, refollowCount, likeCount, commentCount)
 		if userID == -1 {
 			for _, id := range admins {
 				userID, _ = strconv.ParseInt(id, 10, 64)
@@ -1024,4 +1025,15 @@ func likeFollowersPosts(db *bolt.DB) {
 			log.Println("liked", strings.Join(usernames, ", "))
 		}
 	}
+}
+
+func getStatus() (result string) {
+	userinfo, err := insta.GetUserByUsername(insta.LoggedInUser.Username)
+	if err != nil {
+		log.Println("getStatus", insta.LoggedInUser.Username, err)
+	} else {
+		result = fmt.Sprintf("🖼%d, 👀%d, 🐾%d", userinfo.User.MediaCount, userinfo.User.FollowerCount, userinfo.User.FollowingCount)
+	}
+
+	return
 }

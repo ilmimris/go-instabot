@@ -26,3 +26,4 @@ bin/
 pkg/
 vendor/
 go-instabot-ad
+.vscode/
