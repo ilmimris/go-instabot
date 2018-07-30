@@ -163,7 +163,7 @@ func retry(maxAttempts int, sleep time.Duration, function func() error) (err err
 	return fmt.Errorf("After %d attempts, last error: %s", maxAttempts, err)
 }
 
-func Shuffle(slice interface{}) {
+func shuffle(slice interface{}) {
 	rv := reflect.ValueOf(slice)
 	swap := reflect.Swapper(slice)
 	length := rv.Len()
@@ -173,7 +173,7 @@ func Shuffle(slice interface{}) {
 	}
 }
 
-func GetKeys(slice interface{}) []string {
+func getKeys(slice interface{}) []string {
 	keys := reflect.ValueOf(slice).MapKeys()
 	// log.Println(keys)
 	strkeys := make([]string, len(keys))
@@ -203,7 +203,7 @@ func stringInStringSlice(a string, list []string) bool {
 	return false
 }
 
-func SliceUnique(input []string) []string {
+func sliceUnique(input []string) []string {
 	u := make([]string, 0, len(input))
 	m := make(map[string]bool)
 

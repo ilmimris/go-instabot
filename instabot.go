@@ -12,14 +12,14 @@ import (
 	"gopkg.in/telegram-bot-api.v4"
 )
 
-type TelegramResponse struct {
+type telegramResponse struct {
 	body string
 }
 
 var (
-	followRes          chan TelegramResponse
-	unfollowRes        chan TelegramResponse
-	followFollowersRes chan TelegramResponse
+	followRes          chan telegramResponse
+	unfollowRes        chan telegramResponse
+	followFollowersRes chan telegramResponse
 
 	state                    = make(map[string]int)
 	editMessage              = make(map[string]map[int]int)
@@ -57,13 +57,13 @@ func main() {
 	go login()
 
 	startFollowChan, _, _, stopFollowChan := followManager(db)
-	followRes = make(chan TelegramResponse, 10)
+	followRes = make(chan telegramResponse, 10)
 
 	startUnfollowChan, _, _, stopUnfollowChan := unfollowManager(db)
-	unfollowRes = make(chan TelegramResponse, 10)
+	unfollowRes = make(chan telegramResponse, 10)
 
 	startRefollowChan, _, innerRefollowChan, stopRefollowChan := refollowManager(db)
-	followFollowersRes = make(chan TelegramResponse, 10)
+	followFollowersRes = make(chan telegramResponse, 10)
 
 	bot, err := tgbotapi.NewBotAPI(telegramToken)
 	if err != nil {
@@ -73,7 +73,7 @@ func main() {
 	bot.Debug = false
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
-	var ucfg tgbotapi.UpdateConfig = tgbotapi.NewUpdate(0)
+	var ucfg = tgbotapi.NewUpdate(0)
 	ucfg.Timeout = 60
 
 	updates, err := bot.GetUpdatesChan(ucfg)
@@ -142,17 +142,17 @@ func main() {
 				case "cancelfollow":
 					if followIsStarted.IsSet() {
 						stopFollowChan <- true
-						// followRes <- TelegramResponse{"Following canceled"}
+						// followRes <- telegramResponse{"Following canceled"}
 					}
 				case "cancelunfollow":
 					if unfollowIsStarted.IsSet() {
 						stopUnfollowChan <- true
-						// unfollowRes <- TelegramResponse{"Unfollowing canceled"}
+						// unfollowRes <- telegramResponse{"Unfollowing canceled"}
 					}
 				case "cancelrefollow":
 					if refollowIsStarted.IsSet() {
 						stopRefollowChan <- true
-						// followFollowersRes <- TelegramResponse{"Refollowing canceled"}
+						// followFollowersRes <- telegramResponse{"Refollowing canceled"}
 					}
 				case "stats":
 					sendStats(bot, db, int64(update.Message.From.ID))

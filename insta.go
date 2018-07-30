@@ -72,83 +72,83 @@ func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				username := msg
 				user, err := insta.GetUserByUsername(username)
 				if err != nil {
-					followFollowersRes <- TelegramResponse{fmt.Sprintf("%s", err)}
+					followFollowersRes <- telegramResponse{fmt.Sprintf("%s", err)}
 					stopChan <- true
 					return
-				} else {
-					if user.User.IsPrivate {
-						userFriendShip, err := insta.UserFriendShip(user.User.ID)
-						check(err)
-						if !userFriendShip.Following {
-							followFollowersRes <- TelegramResponse{"User profile is private and we are not following, can't process"}
+				}
+
+				if user.User.IsPrivate {
+					userFriendShip, err := insta.UserFriendShip(user.User.ID)
+					check(err)
+					if !userFriendShip.Following {
+						followFollowersRes <- telegramResponse{"User profile is private and we are not following, can't process"}
+						stopChan <- true
+						return
+					}
+				}
+
+				followers, err := insta.TotalUserFollowers(user.User.ID)
+				//log.Println(followers)
+				check(err)
+				var users = followers.Users
+				if len(users) > 0 {
+					rand.Seed(time.Now().UnixNano()) // do it once during app initialization
+					shuffle(users)
+				}
+
+				var limit = viper.GetInt("limits.maxSync")
+				if limit <= 0 || limit >= 1000 {
+					limit = 1000
+				}
+
+				today, _ := getStats(db, "refollow")
+				if today > 0 {
+					limit = limit - today
+				}
+
+				var allCount = int(math.Min(float64(len(users)), float64(limit)))
+				switch {
+				case allCount == 0 && len(users) > 0:
+					followFollowersRes <- telegramResponse{"Follow limit reached :("}
+				case allCount <= 0:
+					followFollowersRes <- telegramResponse{"Followers not found :("}
+				default:
+					var current = 0
+
+					followFollowersRes <- telegramResponse{fmt.Sprintf("%d users will be followed", allCount)}
+
+					for index := range users {
+						if !refollowIsStarted.IsSet() {
 							stopChan <- true
 							return
 						}
-					}
+						if current >= limit {
+							continue
+						}
 
-					followers, err := insta.TotalUserFollowers(user.User.ID)
-					//log.Println(followers)
-					check(err)
-					var users = followers.Users
-					if len(users) > 0 {
-						rand.Seed(time.Now().UnixNano()) // do it once during app initialization
-						Shuffle(users)
-					}
-
-					var limit = viper.GetInt("limits.maxSync")
-					if limit <= 0 || limit >= 1000 {
-						limit = 1000
-					}
-
-					today, _ := getStats(db, "refollow")
-					if today > 0 {
-						limit = limit - today
-					}
-
-					var allCount = int(math.Min(float64(len(users)), float64(limit)))
-					switch {
-					case allCount == 0 && len(users) > 0:
-						followFollowersRes <- TelegramResponse{"Follow limit reached :("}
-					case allCount <= 0:
-						followFollowersRes <- TelegramResponse{"Followers not found :("}
-					default:
-						var current = 0
-
-						followFollowersRes <- TelegramResponse{fmt.Sprintf("%d users will be followed", allCount)}
-
-						for index := range users {
-							if !refollowIsStarted.IsSet() {
-								stopChan <- true
-								return
-							}
-							if current >= limit {
-								continue
-							}
-
-							if users[index].IsPrivate {
-								log.Printf("%s is private, skipping\n", users[index].Username)
+						if users[index].IsPrivate {
+							log.Printf("%s is private, skipping\n", users[index].Username)
+						} else {
+							previoslyFollowed, _ := getFollowed(db, users[index].Username)
+							if previoslyFollowed != "" {
+								log.Printf("%s previously followed at %s, skipping\n", users[index].Username, previoslyFollowed)
 							} else {
-								previoslyFollowed, _ := getFollowed(db, users[index].Username)
-								if previoslyFollowed != "" {
-									log.Printf("%s previously followed at %s, skipping\n", users[index].Username, previoslyFollowed)
+								current++
+								state["refollow"] = int(current * 100 / allCount)
+								state["refollow_current"] = current
+								state["refollow_all_count"] = allCount
+
+								text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)", state["refollow_current"], state["refollow_all_count"], users[index].Username, state["refollow"])
+								followFollowersRes <- telegramResponse{text}
+
+								if !*dev {
+									insta.Follow(users[index].ID)
+									setFollowed(db, users[index].Username)
+									incStats(db, "follow")
+									incStats(db, "refollow")
+									time.Sleep(10 * time.Second)
 								} else {
-									current++
-									state["refollow"] = int(current * 100 / allCount)
-									state["refollow_current"] = current
-									state["refollow_all_count"] = allCount
-
-									text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)", state["refollow_current"], state["refollow_all_count"], users[index].Username, state["refollow"])
-									followFollowersRes <- TelegramResponse{text}
-
-									if !*dev {
-										insta.Follow(users[index].ID)
-										setFollowed(db, users[index].Username)
-										incStats(db, "follow")
-										incStats(db, "refollow")
-										time.Sleep(10 * time.Second)
-									} else {
-										time.Sleep(2 * time.Second)
-									}
+									time.Sleep(2 * time.Second)
 								}
 							}
 						}
@@ -159,7 +159,7 @@ func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 		case <-stopChan:
 			editMessage["refollow"] = make(map[int]int)
 			state["refollow"] = -1
-			followFollowersRes <- TelegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", state["refollow_current"])}
+			followFollowersRes <- telegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", state["refollow_current"])}
 			return
 			//default:
 			//	time.Sleep(100 * time.Millisecond)
@@ -239,7 +239,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				lastLikers := getLastLikers()
 				if len(lastLikers) > 0 {
 					if len(following.Users) > 0 {
-						unfollowRes <- TelegramResponse{fmt.Sprintf("Found %d following, %d likers for last 10 posts\n", len(following.Users), len(lastLikers))}
+						unfollowRes <- telegramResponse{fmt.Sprintf("Found %d following, %d likers for last 10 posts\n", len(following.Users), len(lastLikers))}
 						var notLikers []response.User
 						for index := range following.Users {
 							if !stringInStringSlice(following.Users[index].Username, lastLikers) {
@@ -288,7 +288,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				var current = 0
 				var allCount = int(math.Min(float64(len(users)), float64(limit)))
 				if allCount > 0 {
-					unfollowRes <- TelegramResponse{fmt.Sprintf("%d will be unfollowed", allCount)}
+					unfollowRes <- telegramResponse{fmt.Sprintf("%d will be unfollowed", allCount)}
 
 					for index := range users {
 						if !unfollowIsStarted.IsSet() {
@@ -305,7 +305,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						state["unfollow_current"] = current
 						state["unfollow_all_count"] = allCount
 
-						unfollowRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], users[index].Username, state["unfollow"])}
+						unfollowRes <- telegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], users[index].Username, state["unfollow"])}
 						if !*dev {
 							insta.UnFollow(users[index].ID)
 							setFollowed(db, users[index].Username)
@@ -324,9 +324,9 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			state["unfollow"] = -1
 
 			if state["unfollow_current"] == 0 {
-				unfollowRes <- TelegramResponse{fmt.Sprintf("No one unfollow")}
+				unfollowRes <- telegramResponse{fmt.Sprintf("No one unfollow")}
 			} else {
-				unfollowRes <- TelegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", state["unfollow_current"])}
+				unfollowRes <- telegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n", state["unfollow_current"])}
 				state["unfollow_current"] = 0
 				state["unfollow_all_count"] = 0
 			}
@@ -433,7 +433,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				if allCount > 0 {
 					var current = 0
 
-					Shuffle(tagsList)
+					shuffle(tagsList)
 					for _, tag := range tagsList {
 						if !followIsStarted.IsSet() {
 							stopChan <- true
@@ -461,7 +461,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						numCommented = 0
 
 						text := fmt.Sprintf("\n[%d/%d] ➜ Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
-						followRes <- TelegramResponse{text}
+						followRes <- telegramResponse{text}
 						browse(tag, db, stopChan)
 						time.Sleep(10 * time.Second)
 					}
@@ -470,17 +470,17 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				stopChan <- true
 			}()
 		case <-stopChan:
-			followRes <- TelegramResponse{"Follow finished"}
+			followRes <- telegramResponse{"Follow finished"}
 
 			editMessage["follow"] = make(map[int]int)
 			state["follow"] = -1
 
 			reportAsString := ""
-			for tag, _ := range report {
+			for tag := range report {
 				reportAsString += fmt.Sprintf("#%s: %d 🐾, %d 👍, %d 💌\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
 			}
 			if reportAsString != "" {
-				followRes <- TelegramResponse{reportAsString}
+				followRes <- telegramResponse{reportAsString}
 			}
 			return
 			//default:
@@ -727,7 +727,7 @@ func startFollow(bot *tgbotapi.BotAPI, startChan chan bool, userID int64) {
 	msg := tgbotapi.NewMessage(userID, "")
 	if followIsStarted.IsSet() {
 		msg.Text = fmt.Sprintf("Follow in progress (%d%%)", state["follow"])
-		if len(editMessage["follow"]) > 0 && intInStringSlice(int(userID), GetKeys(editMessage["follow"])) {
+		if len(editMessage["follow"]) > 0 && intInStringSlice(int(userID), getKeys(editMessage["follow"])) {
 			for UserID, EditID := range editMessage["follow"] {
 				edit := tgbotapi.EditMessageTextConfig{
 					BaseEdit: tgbotapi.BaseEdit{
@@ -758,7 +758,7 @@ func startUnfollow(bot *tgbotapi.BotAPI, startChan chan bool, userID int64) {
 	msg := tgbotapi.NewMessage(userID, "")
 	if unfollowIsStarted.IsSet() {
 		msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
-		if len(editMessage["unfollow"]) > 0 && intInStringSlice(int(userID), GetKeys(editMessage["unfollow"])) {
+		if len(editMessage["unfollow"]) > 0 && intInStringSlice(int(userID), getKeys(editMessage["unfollow"])) {
 			for UserID, EditID := range editMessage["unfollow"] {
 				edit := tgbotapi.EditMessageTextConfig{
 					BaseEdit: tgbotapi.BaseEdit{
@@ -791,7 +791,7 @@ func startRefollow(bot *tgbotapi.BotAPI, startChan chan bool, innerRefollowChan 
 	msg := tgbotapi.NewMessage(userID, "")
 	if refollowIsStarted.IsSet() {
 		msg.Text = fmt.Sprintf("Refollow in progress (%d%%)", state["refollow"])
-		if len(editMessage["refollow"]) > 0 && intInStringSlice(int(userID), GetKeys(editMessage["refollow"])) {
+		if len(editMessage["refollow"]) > 0 && intInStringSlice(int(userID), getKeys(editMessage["refollow"])) {
 			edit := tgbotapi.EditMessageTextConfig{
 				BaseEdit: tgbotapi.BaseEdit{
 					ChatID:    int64(userID),
@@ -854,7 +854,7 @@ func addComments(bot *tgbotapi.BotAPI, comments string, userID int64) {
 	if len(comments) > 0 {
 		newComments := strings.Split(comments, ", ")
 		newComments = append(commentsList, newComments...)
-		newComments = SliceUnique(newComments)
+		newComments = sliceUnique(newComments)
 		viper.Set("comments", newComments)
 		viper.WriteConfig()
 		msg.Text = "Comments updated"
@@ -877,7 +877,7 @@ func removeComments(bot *tgbotapi.BotAPI, comments string, userID int64) {
 				newComments = append(newComments, comment)
 			}
 		}
-		newComments = SliceUnique(newComments)
+		newComments = sliceUnique(newComments)
 		viper.Set("comments", newComments)
 		viper.WriteConfig()
 		msg.Text = "Comments removed"
@@ -908,7 +908,7 @@ func addTags(bot *tgbotapi.BotAPI, tag string, userID int64) {
 	if len(tag) > 0 {
 		newTags := strings.Split(tag, ", ")
 		newTags = append(tagsList, newTags...)
-		newTags = SliceUnique(newTags)
+		newTags = sliceUnique(newTags)
 		viper.Set("tags", newTags)
 		viper.WriteConfig()
 		msg.Text = "Tags added"
@@ -931,7 +931,7 @@ func removeTags(bot *tgbotapi.BotAPI, tags string, userID int64) {
 				newTags = append(newTags, tag)
 			}
 		}
-		newTags = SliceUnique(newTags)
+		newTags = sliceUnique(newTags)
 		viper.Set("tags", newTags)
 		viper.WriteConfig()
 		msg.Text = "Tags removed"
@@ -1020,7 +1020,7 @@ func likeFollowersPosts(db *bolt.DB) {
 		}
 		length = len(usernames)
 		if length > 0 {
-			usernames = SliceUnique(usernames)
+			usernames = sliceUnique(usernames)
 			log.Println("liked", strings.Join(usernames, ", "))
 		}
 	}
