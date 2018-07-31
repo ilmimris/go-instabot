@@ -68,10 +68,10 @@ There, in the 'dist/' folder, you will find a sample 'config.json', that you hav
         }
     },
     "limits": {
-        "maxSync": 1000,
-        "daysBeforeUnfollow": 2,
+        "max_unfollow_per_day": 1000,
+        "days_before_unfollow": 2,
         "max_likes_to_account_per_session": 3,
-        "maxRetry": 2,
+        "max_retry": 2,
         "like": {
             "min": 0,
             "count": 20,

@@ -207,7 +207,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				followers, _ := insta.SelfTotalUserFollowers()
 				// check(err)
 
-				var daysBeforeUnfollow = viper.GetInt("limits.daysBeforeUnfollow")
+				var daysBeforeUnfollow = viper.GetInt("limits.days_before_unfollow")
 				if daysBeforeUnfollow <= 0 || daysBeforeUnfollow >= 30 {
 					daysBeforeUnfollow = 3
 				}
@@ -275,7 +275,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 					}
 				}
 
-				var limit = viper.GetInt("limits.maxSync")
+				var limit = viper.GetInt("limits.max_unfollow_per_day")
 				if limit <= 0 || limit >= 1000 {
 					limit = 1000
 				}
@@ -521,7 +521,7 @@ func browse(tag string, db *bolt.DB, stopChan chan bool) {
 
 		goThrough(tag, db, images, stopChan)
 
-		if viper.IsSet("limits.maxRetry") && i > viper.GetInt("limits.maxRetry") {
+		if viper.IsSet("limits.max_retry") && i > viper.GetInt("limits.max_retry") {
 			log.Println("Currently not enough images for this tag to achieve goals")
 			break
 		}
@@ -965,7 +965,7 @@ func removeTags(bot *tgbotapi.BotAPI, tags string, userID int64) {
 func getLimits(bot *tgbotapi.BotAPI, userID int64) {
 	msg := tgbotapi.NewMessage(userID, "")
 
-	limits := []string{"maxSync", "daysBeforeUnfollow", "max_likes_to_account_per_session", "maxRetry", "like.min", "like.count", "like.max", "follow.count", "follow.potency_ratio", "comment.min", "comment.count", "comment.max"}
+	limits := []string{"max_unfollow_per_day", "days_before_unfollow", "max_likes_to_account_per_session", "max_retry", "like.min", "like.count", "like.max", "follow.count", "follow.potency_ratio", "comment.min", "comment.count", "comment.max"}
 	for _, limit := range limits {
 		if limit == "follow.potency_ratio" {
 			msg.Text += fmt.Sprintf("%s: %.2f\n", limit, viper.GetFloat64("limits."+limit))
@@ -980,7 +980,7 @@ func getLimits(bot *tgbotapi.BotAPI, userID int64) {
 func updateLimits(bot *tgbotapi.BotAPI, limitStr string, userID int64) {
 	msg := tgbotapi.NewMessage(userID, "")
 	s := strings.Split(limitStr, " ")
-	limits := []string{"maxSync", "daysBeforeUnfollow", "max_likes_to_account_per_session", "maxRetry", "like.min", "like.count", "like.max", "follow.count", "follow.potency_ratio", "comment.min", "comment.count", "comment.max"}
+	limits := []string{"max_unfollow_per_day", "days_before_unfollow", "max_likes_to_account_per_session", "max_retry", "like.min", "like.count", "like.max", "follow.count", "follow.potency_ratio", "comment.min", "comment.count", "comment.max"}
 	if len(s) != 2 {
 		msg.Text = "/updatelimits limitname integer\nlimitname maybe one of: " + strings.Join(limits, ", ")
 	} else {
