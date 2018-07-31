@@ -29,9 +29,8 @@
             "max": 10000
         },
         "follow": {
-            "min": 200,
             "count": 10,
-            "max": 10000
+            "potency_ratio": 1.21
         }
     },
     "tags": [

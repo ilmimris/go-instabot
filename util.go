@@ -28,9 +28,10 @@ var likeCount int
 
 // A user will be followed if he has more followers than followLowerLimit, and less than followUpperLimit
 // Needs to be a subset of the like interval
-var followLowerLimit int
-var followUpperLimit int
+// var followLowerLimit int
+// var followUpperLimit int
 var followCount int
+var potencyRatio float64
 
 // An image will be commented if the poster has more followers than commentLowerLimit, and less than commentUpperLimit
 // Needs to be a subset of the like interval
@@ -105,9 +106,10 @@ func getConfig() {
 	likeUpperLimit = viper.GetInt("limits.like.max")
 	likeCount = viper.GetInt("limits.like.count")
 
-	followLowerLimit = viper.GetInt("limits.follow.min")
-	followUpperLimit = viper.GetInt("limits.follow.max")
+	// followLowerLimit = viper.GetInt("limits.follow.min")
+	// followUpperLimit = viper.GetInt("limits.follow.max")
 	followCount = viper.GetInt("limits.follow.count")
+	potencyRatio = viper.GetFloat64("limits.follow.potency_ratio")
 
 	commentLowerLimit = viper.GetInt("limits.comment.min")
 	commentUpperLimit = viper.GetInt("limits.comment.max")

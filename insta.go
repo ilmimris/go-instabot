@@ -572,20 +572,37 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		followerCount := poster.FollowerCount
 		likesCount := images.FeedsResponse.Items[index].LikeCount
 		commentsCount := images.FeedsResponse.Items[index].CommentCount
+		followingCount := poster.FollowingCount
 
 		// Will only follow and comment if we like the picture
 		like := numLiked < likeCount && !images.FeedsResponse.Items[index].HasLiked
 		follow := numFollowed < followCount && like
 		comment := numCommented < commentCount && like
 
-		// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
-		if followerCount > followUpperLimit {
-			log.Printf("%s has %d followers, more than max %d\n", poster.Username, followerCount, followUpperLimit)
-			follow = false
-		} else if followerCount < followLowerLimit {
-			log.Printf("%s has %d followers, less than min %d\n", poster.Username, followerCount, followLowerLimit)
-			follow = false
+		var relationshipRatio float64 = 0.0
+
+		if followerCount != 0 && followingCount != 0 {
+			relationshipRatio = float64(followingCount) / float64(followerCount)
 		}
+
+		// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
+
+		if follow {
+			if relationshipRatio == 0 || relationshipRatio < potencyRatio {
+				log.Printf("%s is not a potential user with the relationship ratio of %.2f (%d/%d) ~skipping user\n", poster.Username, relationshipRatio, followingCount, followerCount)
+				follow = false
+			} else {
+				log.Printf("%s with the relationship ratio of %.2f (%d/%d)\n", poster.Username, relationshipRatio, followingCount, followerCount)
+			}
+		}
+
+		// if followerCount > followUpperLimit {
+		// 	log.Printf("%s has %d followers, more than max %d\n", poster.Username, followerCount, followUpperLimit)
+		// 	follow = false
+		// } else if followerCount < followLowerLimit {
+		// 	log.Printf("%s has %d followers, less than min %d\n", poster.Username, followerCount, followLowerLimit)
+		// 	follow = false
+		// }
 
 		if likesCount > likeUpperLimit {
 			log.Printf("%s's image has %d likes, more than max %d\n", poster.Username, likesCount, likeUpperLimit)
@@ -604,38 +621,40 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 		}
 
 		if like || comment || follow {
-			log.Printf("%s has %d followers\n", poster.Username, followerCount)
+			// log.Printf("%s has %d followers\n", poster.Username, followerCount)
 
-			i++
-			// Like, then comment/follow
-			if like {
-				if userLikesCount, ok := likesToAccountPerSession[posterInfo.User.Username]; ok {
-					if userLikesCount < maxLikesToAccountPerSession {
-						likeImage(tag, db, images.FeedsResponse.Items[index], posterInfo)
-						images.FeedsResponse.Items[index].HasLiked = true
+			if relationshipRatio >= potencyRatio {
+				i++
+				// Like, then comment/follow
+				if like {
+					if userLikesCount, ok := likesToAccountPerSession[posterInfo.User.Username]; ok {
+						if userLikesCount < maxLikesToAccountPerSession {
+							likeImage(tag, db, images.FeedsResponse.Items[index], posterInfo)
+							images.FeedsResponse.Items[index].HasLiked = true
+						} else {
+							log.Println("Likes count per user reached [" + poster.Username + "]")
+						}
 					} else {
-						log.Println("Likes count per user reached [" + poster.Username + "]")
+						likeImage(tag, db, images.FeedsResponse.Items[index], posterInfo)
 					}
-				} else {
-					likeImage(tag, db, images.FeedsResponse.Items[index], posterInfo)
-				}
 
-				previoslyFollowed, _ := getFollowed(db, posterInfo.User.Username)
-				if previoslyFollowed != "" {
-					log.Printf("%s already following (%s), skipping\n", posterInfo.User.Username, previoslyFollowed)
-				} else {
-					if comment {
-						if !images.FeedsResponse.Items[index].HasLiked {
-							commentImage(tag, db, images.FeedsResponse.Items[index])
+					previoslyFollowed, _ := getFollowed(db, posterInfo.User.Username)
+					if previoslyFollowed != "" {
+						log.Printf("%s already following (%s), skipping\n", posterInfo.User.Username, previoslyFollowed)
+					} else {
+						if comment {
+							if !images.FeedsResponse.Items[index].HasLiked {
+								commentImage(tag, db, images.FeedsResponse.Items[index])
+							}
+						}
+						if follow {
+							followUser(tag, db, posterInfo)
 						}
 					}
-					if follow {
-						followUser(tag, db, posterInfo)
-					}
-				}
 
-				// This is to avoid the temporary ban by Instagram
-				time.Sleep(30 * time.Second)
+					// This is to avoid the temporary ban by Instagram
+					time.Sleep(30 * time.Second)
+				}
 			}
 		} else {
 			log.Printf("%s, nothing to do\n", poster.Username)
@@ -946,9 +965,13 @@ func removeTags(bot *tgbotapi.BotAPI, tags string, userID int64) {
 func getLimits(bot *tgbotapi.BotAPI, userID int64) {
 	msg := tgbotapi.NewMessage(userID, "")
 
-	limits := []string{"maxSync", "daysBeforeUnfollow", "max_likes_to_account_per_session", "maxRetry", "like.min", "like.count", "like.max", "follow.min", "follow.count", "follow.max", "comment.min", "comment.count", "comment.max"}
+	limits := []string{"maxSync", "daysBeforeUnfollow", "max_likes_to_account_per_session", "maxRetry", "like.min", "like.count", "like.max", "follow.count", "follow.potency_ratio", "comment.min", "comment.count", "comment.max"}
 	for _, limit := range limits {
-		msg.Text += limit + ": " + strconv.Itoa(viper.GetInt("limits."+limit)) + "\n"
+		if limit == "follow.potency_ratio" {
+			msg.Text += fmt.Sprintf("%s: %.2f\n", limit, viper.GetFloat64("limits."+limit))
+		} else {
+			msg.Text += limit + ": " + strconv.Itoa(viper.GetInt("limits."+limit)) + "\n"
+		}
 	}
 
 	bot.Send(msg)
@@ -957,19 +980,31 @@ func getLimits(bot *tgbotapi.BotAPI, userID int64) {
 func updateLimits(bot *tgbotapi.BotAPI, limitStr string, userID int64) {
 	msg := tgbotapi.NewMessage(userID, "")
 	s := strings.Split(limitStr, " ")
-	limits := []string{"maxSync", "daysBeforeUnfollow", "max_likes_to_account_per_session", "maxRetry", "like.min", "like.count", "like.max", "follow.min", "follow.count", "follow.max", "comment.min", "comment.count", "comment.max"}
+	limits := []string{"maxSync", "daysBeforeUnfollow", "max_likes_to_account_per_session", "maxRetry", "like.min", "like.count", "like.max", "follow.count", "follow.potency_ratio", "comment.min", "comment.count", "comment.max"}
 	if len(s) != 2 {
 		msg.Text = "/updatelimits limitname integer\nlimitname maybe one of: " + strings.Join(limits, ", ")
 	} else {
 		limit, count := s[0], s[1]
-		limitCount, _ := strconv.Atoi(count)
+
 		if stringInStringSlice(limit, limits) {
-			if limitCount >= 0 && limitCount <= 10000 {
-				viper.Set("limits."+limit, limitCount)
-				viper.WriteConfig()
-				msg.Text = "Limit updated"
+			if limit == "follow.potency_ratio" {
+				limitCount, _ := strconv.ParseFloat(count, 64)
+				if limitCount >= -100 && limitCount <= 100 {
+					viper.Set("limits."+limit, limitCount)
+					viper.WriteConfig()
+					msg.Text = "Limit updated"
+				} else {
+					msg.Text = "/updatelimits limitname float\ncount should be equal or greater than -100 and less or equal than 100"
+				}
 			} else {
-				msg.Text = "/updatelimits limitname integer\ncount should be equal or greater than 0 and less or equal than 10000"
+				limitCount, _ := strconv.Atoi(count)
+				if limitCount >= 0 && limitCount <= 10000 {
+					viper.Set("limits."+limit, limitCount)
+					viper.WriteConfig()
+					msg.Text = "Limit updated"
+				} else {
+					msg.Text = "/updatelimits limitname integer\ncount should be equal or greater than 0 and less or equal than 10000"
+				}
 			}
 		} else {
 			msg.Text = "/updatelimits limitname integer\nlimitname maybe one of: " + strings.Join(limits, ", ")
