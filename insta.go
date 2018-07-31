@@ -435,7 +435,25 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				report = make(map[string]map[string]int)
 				likesToAccountPerSession = make(map[string]int)
 
-				time.Sleep(1 * time.Second)
+				followTestUsername := viper.GetString("user.instagram.follow_test_username")
+				if followTestUsername != "" {
+					user, err := insta.GetUserByUsername(followTestUsername)
+					if err != nil {
+						log.Println("test instagram username not found")
+					} else {
+						_, err := insta.Follow(user.User.ID)
+						if err != nil {
+							text := fmt.Sprintf("test user not followed, cancel /follow %v", err)
+							followRes <- telegramResponse{text}
+
+							stopChan <- true
+							return
+						} else {
+							insta.UnFollow(user.User.ID)
+						}
+					}
+				}
+
 				var allCount = len(tagsList)
 				if allCount > 0 {
 					var current = 0

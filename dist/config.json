@@ -2,7 +2,8 @@
     "user": {
         "instagram": {
             "username": "foobar",
-            "password": "fooBAR"
+            "password": "fooBAR",
+            "follow_test_username": "testuser"
         },
         "telegram": {
             "admins": [
