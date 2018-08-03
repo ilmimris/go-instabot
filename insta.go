@@ -206,7 +206,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				var limit = viper.GetInt("limits.max_unfollow_per_day")
 				today, _ := getStats(db, "unfollow")
 
-				if today == 0 || (limit-today) <= 0 {
+				if limit == 0 || (limit-today) <= 0 {
 					stopChan <- true
 					return
 				}
