@@ -493,7 +493,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 							elapsed := time.Since(followStartedAt)
 							perOne := elapsed.Seconds() / float64(current)
 							duration := time.Duration(time.Duration(perOne*float64(allCount-current+1)) * time.Second)
-							reportAsString += fmt.Sprintf(" [%s]\n", duration.Round(time.Second))
+							reportAsString += fmt.Sprintf(" ~%s", duration.Round(time.Second))
 						}
 
 						for tag := range report {
@@ -501,7 +501,9 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						}
 						followRes <- telegramResponse{reportAsString}
 						browse(tag, db, stopChan)
-						time.Sleep(10 * time.Second)
+						if current != allCount {
+							time.Sleep(10 * time.Second)
+						}
 					}
 				}
 
