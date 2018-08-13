@@ -423,12 +423,15 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 	usersInfo = make(map[string]response.GetUsernameResponse)
 	tagFeed = make(map[string]response.TagFeedsResponse)
 
+	followStartedAt := time.Now()
+
 	defer followIsStarted.UnSet()
 	for {
 		select {
 		case msg := <-innerChan:
 			fmt.Println("follow <- ", msg)
 			go func() {
+				followStartedAt = time.Now()
 				state["follow"] = 0
 				time.Sleep(1 * time.Second)
 
@@ -467,7 +470,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 
 						current++
 
-						state["follow"] = int(current * 100 / allCount)
+						state["follow"] = int((current - 1) * 100 / allCount)
 						state["follow_current"] = current
 						state["follow_all_count"] = allCount
 
@@ -485,8 +488,18 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						numLiked = 0
 						numCommented = 0
 
-						text := fmt.Sprintf("\n[%d/%d] ➜ Current tag is %s (%d%%)\n", state["follow_current"], state["follow_all_count"], tag, state["follow"])
-						followRes <- telegramResponse{text}
+						reportAsString := fmt.Sprintf("\n[%d/%d] ➜ Current tag is %s (%d%%)", state["follow_current"], state["follow_all_count"], tag, state["follow"])
+						if current > 1 {
+							elapsed := time.Since(followStartedAt)
+							perOne := elapsed.Seconds() / float64(current)
+							duration := time.Duration(time.Duration(perOne*float64(allCount-current+1)) * time.Second)
+							reportAsString += fmt.Sprintf(" [%s]\n", duration.Round(time.Second))
+						}
+
+						for tag := range report {
+							reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
+						}
+						followRes <- telegramResponse{reportAsString}
 						browse(tag, db, stopChan)
 						time.Sleep(10 * time.Second)
 					}
@@ -495,12 +508,13 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				stopChan <- true
 			}()
 		case <-stopChan:
+			elapsed := time.Since(followStartedAt)
 			followRes <- telegramResponse{"Follow finished"}
 
 			editMessage["follow"] = make(map[int]int)
 			state["follow"] = -1
 
-			reportAsString := ""
+			reportAsString := fmt.Sprintf("Finished by %s", elapsed.Round(time.Second))
 			for tag := range report {
 				reportAsString += fmt.Sprintf("#%s: %d 🐾, %d 👍, %d 💌\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
 			}
