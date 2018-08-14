@@ -516,7 +516,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			editMessage["follow"] = make(map[int]int)
 			state["follow"] = -1
 
-			reportAsString := fmt.Sprintf("Finished by %s", elapsed.Round(time.Second))
+			reportAsString := fmt.Sprintf("Finished by %s\n", elapsed.Round(time.Second))
 			for tag := range report {
 				reportAsString += fmt.Sprintf("#%s: %d 🐾, %d 👍, %d 💌\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
 			}
