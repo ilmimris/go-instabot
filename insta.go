@@ -146,7 +146,7 @@ func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 									setFollowed(db, users[index].Username)
 									incStats(db, "follow")
 									incStats(db, "refollow")
-									time.Sleep(10 * time.Second)
+									time.Sleep(16 * time.Second)
 								} else {
 									time.Sleep(2 * time.Second)
 								}
@@ -317,7 +317,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 							insta.UnFollow(users[index].ID)
 							setFollowed(db, users[index].Username)
 							incStats(db, "unfollow")
-							time.Sleep(60 * time.Second)
+							time.Sleep(16 * time.Second)
 						} else {
 							time.Sleep(2 * time.Second)
 						}
@@ -497,7 +497,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						}
 
 						for tag := range report {
-							reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌\n", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
+							reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
 						}
 						followRes <- telegramResponse{reportAsString}
 						browse(tag, db, stopChan)
@@ -1077,8 +1077,8 @@ func getLastLikers() (result []string) {
 func likeFollowersPosts(db *bolt.DB) {
 	timeline, _ := insta.Timeline("")
 	length := len(timeline.Items)
-	if length > 20 {
-		length = 20
+	if length > 16 {
+		length = 16
 	}
 
 	var usernames []string
@@ -1102,6 +1102,35 @@ func likeFollowersPosts(db *bolt.DB) {
 		}
 	}
 }
+
+// func likeFollowersStories(db *bolt.DB) {
+// 	stories, _ := insta.GetReelsTrayFeed("")
+// 	length := len(stories.Tray)
+// 	if length > 10 {
+// 		length = 10
+// 	}
+
+// 	var usernames []string
+
+// 	if length > 0 {
+// 		items := stories.Tray[0:length]
+// 		for index := range items {
+// 			// log.Println(item.ID, item.Caption, item.User.Username)
+// 			if !items[index].Seen {
+// 				time.Sleep(10 * time.Second)
+// 				insta.media.Seen(items[index].ID)
+// 				incStats(db, "seen")
+
+// 				usernames = append(usernames, items[index].User.Username)
+// 			}
+// 		}
+// 		length = len(usernames)
+// 		if length > 0 {
+// 			usernames = sliceUnique(usernames)
+// 			log.Println("seen", strings.Join(usernames, ", "))
+// 		}
+// 	}
+// }
 
 func getStatus() (result string) {
 	userinfo, err := insta.GetUserByUsername(insta.LoggedInUser.Username)
