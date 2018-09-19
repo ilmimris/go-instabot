@@ -95,6 +95,10 @@ func main() {
 	for { //update := range updates {
 		select {
 		case update := <-updates:
+			if update.EditedMessage != nil {
+				continue
+			}
+
 			// UserName := update.Message.From.UserName
 			// log.Println(UserID)
 			if intInStringSlice(int(update.Message.From.ID), admins) {
