@@ -261,7 +261,7 @@ func followLikers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 												state["followLikers_current"] = current
 												state["followLikers_all_count"] = allCount
 
-												text := fmt.Sprintf("[%d/%d] followLikersing %s (%d%%)", state["followLikers_current"], state["followLikers_all_count"], users[index].Username, state["followLikers"])
+												text := fmt.Sprintf("[%d/%d] following %s (%d%%)", state["followLikers_current"], state["followLikers_all_count"], users[index].Username, state["followLikers"])
 												followLikersRes <- telegramResponse{text}
 
 												if !*dev {
@@ -288,7 +288,7 @@ func followLikers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 		case <-stopChan:
 			editMessage["followLikers"] = make(map[int]int)
 			state["followLikers"] = -1
-			followLikersRes <- telegramResponse{fmt.Sprintf("\nfollowLikersed %d users!\n", state["followLikers_current"])}
+			followLikersRes <- telegramResponse{fmt.Sprintf("\nfollowed %d users!\n", state["followLikers_current"])}
 			return
 			//default:
 			//	time.Sleep(100 * time.Millisecond)

@@ -262,6 +262,26 @@ func main() {
 					editMessage["refollow"][int(reportID)] = msgRes.MessageID
 				}
 			}
+		case resp := <-followLikersRes:
+			log.Println(resp.body)
+			if len(editMessage["followLikers"]) > 0 {
+				for UserID, EditID := range editMessage["followLikers"] {
+					edit := tgbotapi.EditMessageTextConfig{
+						BaseEdit: tgbotapi.BaseEdit{
+							ChatID:    int64(UserID),
+							MessageID: EditID,
+						},
+						Text: resp.body,
+					}
+					bot.Send(edit)
+				}
+			} else {
+				msg := tgbotapi.NewMessage(reportID, resp.body)
+				msgRes, err := bot.Send(msg)
+				if err == nil {
+					editMessage["followLikers"][int(reportID)] = msgRes.MessageID
+				}
+			}
 		}
 	}
 }
