@@ -40,6 +40,7 @@ Commands list for BotFather:
  - cancelfollow - остановить задачу подписок
  - cancelunfollow - остановить задачу отписок
  - cancelrefollow - прекратить подписку на подписчиков пользователя
+ - cancelfollowLikers - прекратить подписку на тех, кому понравился пост
  - getcomments - список комментов для отправки
  - addcomments - добавить комменты (через ", ")
  - removecomments - удалить комменты (через ", ")
@@ -48,6 +49,7 @@ Commands list for BotFather:
  - removetags - удалить тэги (через ", ")
  - getlimits - получить список значений лимитов
  - updatelimits - установить значение лимита
+ - followLikers post url - подписаться на тех, кому понравился пост 
 
 There, in the 'dist/' folder, you will find a sample 'config.json', that you have to copy to the 'config/' folder :
 

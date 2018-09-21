@@ -20,6 +20,7 @@ var (
 	followRes          chan telegramResponse
 	unfollowRes        chan telegramResponse
 	followFollowersRes chan telegramResponse
+	followLikersRes    chan telegramResponse
 
 	state                    = make(map[string]int)
 	editMessage              = make(map[string]map[int]int)
@@ -33,9 +34,10 @@ var (
 
 	commandKeyboard tgbotapi.ReplyKeyboardMarkup
 
-	followIsStarted   = abool.New()
-	unfollowIsStarted = abool.New()
-	refollowIsStarted = abool.New()
+	followIsStarted       = abool.New()
+	unfollowIsStarted     = abool.New()
+	refollowIsStarted     = abool.New()
+	followLikersIsStarted = abool.New()
 )
 var db *bolt.DB
 
@@ -43,6 +45,7 @@ func main() {
 	editMessage["follow"] = make(map[int]int)
 	editMessage["unfollow"] = make(map[int]int)
 	editMessage["refollow"] = make(map[int]int)
+	editMessage["followLikers"] = make(map[int]int)
 
 	db, err := initBolt()
 	if err != nil {
@@ -64,6 +67,9 @@ func main() {
 
 	startRefollowChan, _, innerRefollowChan, stopRefollowChan := refollowManager(db)
 	followFollowersRes = make(chan telegramResponse, 10)
+
+	startfollowLikersChan, _, innerfollowLikersChan, stopFollowLikersChan := followLikersManager(db)
+	followLikersRes = make(chan telegramResponse, 10)
 
 	bot, err := tgbotapi.NewBotAPI(telegramToken)
 	if err != nil {
@@ -121,6 +127,13 @@ func main() {
 					} else {
 						startRefollow(bot, startRefollowChan, innerRefollowChan, int64(update.Message.From.ID), args)
 					}
+				case "followlikers":
+					if args == "" {
+						msg.Text = fmt.Sprintf("/followlikers post link")
+						bot.Send(msg)
+					} else {
+						startFollowLikers(bot, startfollowLikersChan, innerfollowLikersChan, int64(update.Message.From.ID), args)
+					}
 				case "follow":
 					startFollow(bot, startFollowChan, int64(update.Message.From.ID))
 				case "unfollow":
@@ -156,6 +169,11 @@ func main() {
 				case "cancelrefollow":
 					if refollowIsStarted.IsSet() {
 						stopRefollowChan <- true
+						// followFollowersRes <- telegramResponse{"Refollowing canceled"}
+					}
+				case "cancelfollowlikers":
+					if followLikersIsStarted.IsSet() {
+						stopFollowLikersChan <- true
 						// followFollowersRes <- telegramResponse{"Refollowing canceled"}
 					}
 				case "stats":

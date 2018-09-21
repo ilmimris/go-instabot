@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -160,6 +161,134 @@ func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			editMessage["refollow"] = make(map[int]int)
 			state["refollow"] = -1
 			followFollowersRes <- telegramResponse{fmt.Sprintf("\nRefollowed %d users!\n", state["refollow_current"])}
+			return
+			//default:
+			//	time.Sleep(100 * time.Millisecond)
+		}
+	}
+}
+
+func followLikersManager(db *bolt.DB) (startChan chan bool, outerChan, innerChan chan string, stopChan chan bool) {
+	startChan = make(chan bool)
+	outerChan = make(chan string)
+	innerChan = make(chan string)
+	stopChan = make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-startChan:
+				if !followLikersIsStarted.IsSet() {
+					followLikersIsStarted.Set()
+					go followLikers(db, innerChan, stopChan)
+					// innerChan <- "start"
+				} else {
+					fmt.Println("can't start task, task already running!")
+				}
+			case msg := <-outerChan:
+				fmt.Println("followLikers <- ", msg)
+				//default:
+				//	time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}()
+	return startChan, outerChan, innerChan, stopChan
+}
+
+func followLikers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
+	defer followLikersIsStarted.UnSet()
+	for {
+		select {
+		case msg := <-innerChan:
+			fmt.Println("followLikers <- ", msg)
+			go func() {
+				state["followLikers"] = 0
+				time.Sleep(1 * time.Second)
+
+				if len(msg) > 0 {
+					u, err := url.Parse(msg)
+					if err == nil {
+						test := strings.TrimPrefix(u.Path, "/p/")
+						test = strings.TrimSuffix(test, "/")
+						likers, err := insta.MediaLikers(MediaFromCode(test))
+						if err != nil {
+							println(err.Error())
+						} else {
+							users := likers.Users
+							if len(users) > 0 {
+								println(fmt.Sprintf("found %d likers", len(users)))
+								rand.Seed(time.Now().UnixNano()) // do it once during app initialization
+								shuffle(users)
+
+								var limit = viper.GetInt("limits.maxSync")
+								if limit <= 0 || limit >= 1000 {
+									limit = 1000
+								}
+
+								today, _ := getStats(db, "followLikers")
+								if today > 0 {
+									limit = limit - today
+								}
+
+								var allCount = int(math.Min(float64(len(users)), float64(limit)))
+								switch {
+								case allCount == 0 && len(users) > 0:
+									followLikersRes <- telegramResponse{"Follow limit reached :("}
+								case allCount <= 0:
+									followLikersRes <- telegramResponse{"Likers not found :("}
+								default:
+									var current = 0
+
+									followLikersRes <- telegramResponse{fmt.Sprintf("%d users will be followed", allCount)}
+
+									for index := range users {
+										if !followLikersIsStarted.IsSet() {
+											stopChan <- true
+											return
+										}
+										if current >= limit {
+											continue
+										}
+
+										if users[index].IsPrivate {
+											log.Printf("%s is private, skipping\n", users[index].Username)
+										} else {
+											previoslyFollowed, _ := getFollowed(db, users[index].Username)
+											if previoslyFollowed != "" {
+												log.Printf("%s previously followed at %s, skipping\n", users[index].Username, previoslyFollowed)
+											} else {
+												current++
+												state["followLikers"] = int(current * 100 / allCount)
+												state["followLikers_current"] = current
+												state["followLikers_all_count"] = allCount
+
+												text := fmt.Sprintf("[%d/%d] followLikersing %s (%d%%)", state["followLikers_current"], state["followLikers_all_count"], users[index].Username, state["followLikers"])
+												followLikersRes <- telegramResponse{text}
+
+												if !*dev {
+													insta.Follow(users[index].ID)
+													setFollowed(db, users[index].Username)
+													incStats(db, "like")
+													incStats(db, "followLikers")
+													time.Sleep(16 * time.Second)
+												} else {
+													time.Sleep(2 * time.Second)
+												}
+											}
+										}
+									}
+								}
+							} else {
+								println("likers not found")
+							}
+						}
+					}
+				}
+				stopChan <- true
+			}()
+		case <-stopChan:
+			editMessage["followLikers"] = make(map[int]int)
+			state["followLikers"] = -1
+			followLikersRes <- telegramResponse{fmt.Sprintf("\nfollowLikersed %d users!\n", state["followLikers_current"])}
 			return
 			//default:
 			//	time.Sleep(100 * time.Millisecond)
@@ -877,6 +1006,36 @@ func startRefollow(bot *tgbotapi.BotAPI, startChan chan bool, innerRefollowChan 
 	}
 }
 
+func startFollowLikers(bot *tgbotapi.BotAPI, startChan chan bool, innerFollowLikersChan chan string, userID int64, target string) {
+	msg := tgbotapi.NewMessage(userID, "")
+	if followLikersIsStarted.IsSet() {
+		msg.Text = fmt.Sprintf("followLikers in progress (%d%%)", state["followLikers"])
+		if len(editMessage["followLikers"]) > 0 && intInStringSlice(int(userID), getKeys(editMessage["followLikers"])) {
+			edit := tgbotapi.EditMessageTextConfig{
+				BaseEdit: tgbotapi.BaseEdit{
+					ChatID:    int64(userID),
+					MessageID: editMessage["followLikers"][int(userID)],
+				},
+				Text: msg.Text,
+			}
+			bot.Send(edit)
+		} else {
+			msgRes, err := bot.Send(msg)
+			if err == nil {
+				editMessage["followLikers"][int(userID)] = msgRes.MessageID
+			}
+		}
+	} else {
+		startChan <- true
+		msg.Text = "Starting followLikers"
+		msgRes, err := bot.Send(msg)
+		if err == nil {
+			editMessage["followLikers"][int(userID)] = msgRes.MessageID
+		}
+		innerFollowLikersChan <- target
+	}
+}
+
 func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, userID int64) {
 	msg := tgbotapi.NewMessage(userID, "")
 	unfollowCount, _ := getStats(db, "unfollow")
@@ -1141,4 +1300,39 @@ func getStatus() (result string) {
 	}
 
 	return
+}
+
+func stringToBin(s string) (binString string) {
+	for _, c := range s {
+		binString = fmt.Sprintf("%s%b", binString, c)
+	}
+	return
+}
+
+func leftPad2Len(s string, padStr string, overallLen int) string {
+	var padCountInt int
+	padCountInt = 1 + ((overallLen - len(padStr)) / len(padStr))
+	var retStr = strings.Repeat(padStr, padCountInt) + s
+	return retStr[(len(retStr) - overallLen):]
+}
+
+func bin2int(binStr string) string {
+	result, _ := strconv.ParseInt(binStr, 2, 64)
+	return strconv.FormatInt(result, 10)
+}
+
+// Base64UrlCharmap - all posible characters
+const Base64UrlCharmap = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+func MediaFromCode(code string) string {
+
+	base2 := ""
+	for i := 0; i < len(code); i++ {
+		base64 := strings.Index(Base64UrlCharmap, string(code[i]))
+		str2bin := strconv.FormatInt(int64(base64), 2)
+		sixbits := leftPad2Len(str2bin, "0", 6)
+		base2 = base2 + sixbits
+	}
+
+	return bin2int(base2)
 }
