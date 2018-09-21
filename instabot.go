@@ -151,7 +151,11 @@ func main() {
 					if state["refollow"] >= 0 {
 						refollowProgress = fmt.Sprintf("%d%% [%d/%d]", state["refollow"], state["refollow_current"], state["refollow_all_count"])
 					}
-					msg.Text = fmt.Sprintf("Unfollow — %s\nFollow — %s\nRefollow — %s", unfollowProgress, followProgress, refollowProgress)
+					var followLikersProgress = "not started"
+					if state["followLikers"] >= 0 {
+						followLikersProgress = fmt.Sprintf("%d%% [%d/%d]", state["followLikers"], state["followLikers_current"], state["followLikers_all_count"])
+					}
+					msg.Text = fmt.Sprintf("Unfollow — %s\nFollow — %s\nRefollow — %s\nfollowLikers - %s", unfollowProgress, followProgress, refollowProgress, followLikersProgress)
 					msgRes, err := bot.Send(msg)
 					if err != nil {
 						editMessage["progress"][update.Message.From.ID] = msgRes.MessageID
