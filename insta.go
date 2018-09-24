@@ -1219,7 +1219,7 @@ func getLastLikers() (result []string) {
 	latest, _ := insta.LatestFeed()
 	l := latest.Items
 	if len(l) > 10 {
-		l := latest.Items[0:10] //last 10 posts
+		l = latest.Items[0:10] //last 10 posts
 	}
 	for lindex := range l {
 		// log.Println(item.ID, item.HasLiked, item.LikeCount)
