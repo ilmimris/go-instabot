@@ -42,10 +42,6 @@
   version = "0.8.0"
 
 [[constraint]]
-  name = "github.com/robfig/cron"
-  version = "1.1.0"
-
-[[constraint]]
   name = "github.com/spf13/viper"
   version = "1.0.2"
 
@@ -64,3 +60,6 @@
 [prune]
   go-tests = true
   unused-packages = true
+[[constraint]]
+  name = "github.com/ad/cron"
+  version = "2.0.0"

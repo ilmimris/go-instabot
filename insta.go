@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ad/cron"
 	"github.com/ahmdrz/goinsta"
 	"github.com/ahmdrz/goinsta/response"
 	"github.com/boltdb/bolt"
@@ -1036,26 +1037,74 @@ func startFollowLikers(bot *tgbotapi.BotAPI, startChan chan bool, innerFollowLik
 	}
 }
 
-func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, userID int64) {
-	msg := tgbotapi.NewMessage(userID, "")
+func getJobState(c *cron.Cron, id int) (result string) {
+	if id <= 0 {
+		return "not found"
+	}
+
+	switch c.Status(id) {
+	case 0:
+		return "active"
+	case 1:
+		return "paused"
+	case -1:
+		return "not started"
+	}
+	return "unknown"
+}
+
+func sendStats(bot *tgbotapi.BotAPI, db *bolt.DB, c *cron.Cron, userID int64) {
+	message := `<i>%s</i>
+
+<b>Today stats</b>
+Unfollowed — %d
+Followed — %d
+	Refollowed — %d
+	Followed likers — %d
+Liked — %d
+Commented — %d
+
+<b>Cron status</b>
+follow %s
+unfollow %s
+like %s
+stats %s`
+
 	unfollowCount, _ := getStats(db, "unfollow")
 	followCount, _ := getStats(db, "follow")
 	refollowCount, _ := getStats(db, "refollow")
 	followLikersCount, _ := getStats(db, "followLikers")
 	likeCount, _ := getStats(db, "like")
 	commentCount, _ := getStats(db, "comment")
-	if unfollowCount > 0 || followCount > 0 || refollowCount > 0 || likeCount > 0 || commentCount > 0 || followLikersCount > 0 {
-		stats := getStatus()
-		msg.Text = fmt.Sprintf("%s\nUnfollowed: %d\nFollowed: %d\nRefollowed: %d\nFollow likers: %d\nLiked: %d\nCommented: %d", stats, unfollowCount, followCount, refollowCount, followLikersCount, likeCount, commentCount)
-		if userID == -1 {
-			for _, id := range admins {
-				userID, _ = strconv.ParseInt(id, 10, 64)
-				msg.ChatID = userID
-				bot.Send(msg)
-			}
-		} else {
+
+	stats := getStatus()
+
+	msg := tgbotapi.NewMessage(userID, fmt.Sprintf(message,
+		stats,
+		unfollowCount,
+		followCount,
+		refollowCount,
+		followLikersCount,
+		likeCount,
+		commentCount,
+		getJobState(c, cronFollow),
+		getJobState(c, cronUnfollow),
+		getJobState(c, cronStats),
+		getJobState(c, cronLike),
+	))
+
+	msg.DisableWebPagePreview = true
+	msg.ParseMode = "HTML"
+	msg.DisableNotification = true
+
+	if userID == -1 {
+		for _, id := range admins {
+			userID, _ = strconv.ParseInt(id, 10, 64)
+			msg.ChatID = userID
 			bot.Send(msg)
 		}
+	} else {
+		bot.Send(msg)
 	}
 }
 

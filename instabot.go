@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/ad/cron"
 	"github.com/boltdb/bolt"
+
 	"github.com/fsnotify/fsnotify"
-	"github.com/robfig/cron"
 	"github.com/spf13/viper"
 	"github.com/tevino/abool"
 	"gopkg.in/telegram-bot-api.v4"
@@ -38,6 +39,11 @@ var (
 	unfollowIsStarted     = abool.New()
 	refollowIsStarted     = abool.New()
 	followLikersIsStarted = abool.New()
+
+	cronFollow   int
+	cronUnfollow int
+	cronStats    int
+	cronLike     int
 )
 var db *bolt.DB
 
@@ -88,10 +94,10 @@ func main() {
 		log.Fatalf("[INIT] [Failed to init Telegram updates chan: %v]", err)
 	}
 
-	c.AddFunc("0 0 9 * * *", func() { fmt.Println("Start follow"); startFollow(bot, startFollowChan, reportID) })
-	c.AddFunc("0 0 22 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot, startUnfollowChan, reportID) })
-	c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db, -1) })
-	c.AddFunc("0 30 10-21 * * *", func() { fmt.Println("Like followers"); likeFollowersPosts(db) })
+	cronFollow, _ = c.AddFunc("0 0 9 * * *", func() { fmt.Println("Start follow"); startFollow(bot, startFollowChan, reportID) })
+	cronUnfollow, _ = c.AddFunc("0 0 22 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot, startUnfollowChan, reportID) })
+	cronStats, _ = c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db, c, -1) })
+	cronLike, _ = c.AddFunc("0 30 10-21 * * *", func() { fmt.Println("Like followers"); likeFollowersPosts(db) })
 
 	for _, task := range c.Entries() {
 		log.Println(task.Next)
@@ -181,7 +187,7 @@ func main() {
 						// followFollowersRes <- telegramResponse{"Refollowing canceled"}
 					}
 				case "stats":
-					sendStats(bot, db, int64(update.Message.From.ID))
+					sendStats(bot, db, c, int64(update.Message.From.ID))
 				case "getcomments":
 					sendComments(bot, int64(update.Message.From.ID))
 				case "addcomments":
