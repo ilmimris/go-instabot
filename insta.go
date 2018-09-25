@@ -268,7 +268,7 @@ func followLikers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 												if !*dev {
 													insta.Follow(users[index].ID)
 													setFollowed(db, users[index].Username)
-													incStats(db, "like")
+													incStats(db, "follow")
 													incStats(db, "followLikers")
 													time.Sleep(16 * time.Second)
 												} else {
