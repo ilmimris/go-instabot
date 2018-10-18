@@ -123,6 +123,8 @@ func main() {
 				// log.Printf("[%d] %s, %s, %s", UserID, Text, Command, Args)
 
 				msg := tgbotapi.NewMessage(int64(update.Message.From.ID), "")
+				msg.DisableWebPagePreview = true
+				msg.DisableNotification = true
 
 				switch command {
 
