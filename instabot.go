@@ -194,9 +194,9 @@ func main() {
 				case "getwhitelist":
 					sendWhitelist(bot, int64(update.Message.From.ID))
 				case "addwhitelist":
-					addWhitelist(bot, Args, int64(update.Message.From.ID))
+					addWhitelist(bot, args, int64(update.Message.From.ID))
 				case "removewhitelist":
-					removeWhitelist(bot, Args, int64(update.Message.From.ID))
+					removeWhitelist(bot, args, int64(update.Message.From.ID))
 				case "getlimits":
 					getLimits(bot, int64(update.Message.From.ID))
 				case "updatelimits":

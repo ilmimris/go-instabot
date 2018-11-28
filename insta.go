@@ -1243,7 +1243,7 @@ func addWhitelist(bot *tgbotapi.BotAPI, item string, UserID int64) {
 	if len(item) > 0 {
 		newWhiteList := strings.Split(item, ", ")
 		newWhiteList = append(whiteList, newWhiteList...)
-		newWhiteList = SliceUnique(newWhiteList)
+		newWhiteList = sliceUnique(newWhiteList)
 		viper.Set("whitelist", newWhiteList)
 		viper.WriteConfig()
 		msg.Text = "whiteList added"
