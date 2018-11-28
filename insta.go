@@ -1266,7 +1266,7 @@ func removeWhitelist(bot *tgbotapi.BotAPI, items string, UserID int64) {
 				newWhiteList = append(newWhiteList, item)
 			}
 		}
-		newWhiteList = SliceUnique(newWhiteList)
+		newWhiteList = sliceUnique(newWhiteList)
 		viper.Set("whitelist", newWhiteList)
 		viper.WriteConfig()
 		msg.Text = "whiteList removed"
