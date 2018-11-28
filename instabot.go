@@ -10,6 +10,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 	"github.com/tevino/abool"
+	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )
 
 type telegramResponse struct {

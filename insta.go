@@ -19,6 +19,8 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/spf13/viper"
 	"github.com/tducasse/goinsta/store"
+
+	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )
 
 // Insta is a goinsta.Instagram instance
