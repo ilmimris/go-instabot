@@ -10,7 +10,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 	"github.com/tevino/abool"
-	"gopkg.in/telegram-bot-api.v4"
 )
 
 type telegramResponse struct {
@@ -191,6 +190,12 @@ func main() {
 					addTags(bot, args, int64(update.Message.From.ID))
 				case "removetags":
 					removeTags(bot, args, int64(update.Message.From.ID))
+				case "getwhitelist":
+					sendWhitelist(bot, int64(update.Message.From.ID))
+				case "addwhitelist":
+					addWhitelist(bot, Args, int64(update.Message.From.ID))
+				case "removewhitelist":
+					removeWhitelist(bot, Args, int64(update.Message.From.ID))
 				case "getlimits":
 					getLimits(bot, int64(update.Message.From.ID))
 				case "updatelimits":
