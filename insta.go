@@ -438,8 +438,8 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 							continue
 						}
 
-						if stringInStringSlice(user.Username, whiteList) {
-							unfollowRes <- TelegramResponse{fmt.Sprintf("[%d/%d] Skip Unfollowing %s (%d%%), in white list\n", state["unfollow_current"], state["unfollow_all_count"], user.Username, state["unfollow"])}
+						if stringInStringSlice(users[index].Username, whiteList) {
+							telegramResp <- telegramResponse{fmt.Sprintf("[%d/%d] Skip Unfollowing %s (%d%%), in white list\n", state["unfollow_current"], state["unfollow_all_count"], users[index].Username, state["unfollow"]), "unfollow"}
 							continue
 						}
 
@@ -728,8 +728,8 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 			break
 		}
 
-		if stringInStringSlice(image.User.Username, whiteList) {
-			unfollowRes <- TelegramResponse{fmt.Sprintf("Skip following %s, in white list\n", image.User.Username)}
+		if stringInStringSlice(images.FeedsResponse.Items[index].User.Username, whiteList) {
+			log.Printf("Skip following %s, in white list\n", images.FeedsResponse.Items[index].User.Username)
 			continue
 		}
 
@@ -1236,7 +1236,7 @@ func sendWhitelist(bot *tgbotapi.BotAPI, UserID int64) {
 	bot.Send(msg)
 }
 
-func addWhitelist(bot *tgbotapi.BotAPI, tag string, UserID int64) {
+func addWhitelist(bot *tgbotapi.BotAPI, item string, UserID int64) {
 	msg := tgbotapi.NewMessage(UserID, "")
 	// if len(tags) > 0 {
 	item = strings.Replace(item, ".", "", -1)
