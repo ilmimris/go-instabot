@@ -14,11 +14,13 @@ import (
 	"time"
 
 	"github.com/ad/cron"
-	"github.com/ahmdrz/goinsta"
-	"github.com/ahmdrz/goinsta/response"
+
+	"github.com/tducasse/goinsta"
+	"github.com/tducasse/goinsta/response"
+	"github.com/tducasse/goinsta/store"
+
 	"github.com/boltdb/bolt"
 	"github.com/spf13/viper"
-	"github.com/tducasse/goinsta/store"
 
 	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )

@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"time"
 
 	"github.com/ad/cron"
 	"github.com/boltdb/bolt"
@@ -78,6 +81,10 @@ func main() {
 	bot.Debug = false
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
+	msg := tgbotapi.NewMessage(int64(reportID), "Starting...")
+	msg.DisableNotification = true
+	bot.Send(msg)
+
 	var ucfg = tgbotapi.NewUpdate(0)
 	ucfg.Timeout = 60
 
@@ -95,6 +102,18 @@ func main() {
 	for _, task := range c.Entries() {
 		log.Println(task.Next)
 	}
+
+	go func() {
+		sigchan := make(chan os.Signal, 10)
+		signal.Notify(sigchan, os.Interrupt)
+		<-sigchan
+
+		msg := tgbotapi.NewMessage(int64(reportID), "Stopping...")
+		msg.DisableNotification = true
+		bot.Send(msg)
+		time.Sleep(3 * time.Second)
+		os.Exit(0)
+	}()
 
 	// read updated
 	for { //update := range updates {
