@@ -1,4 +1,4 @@
-package main
+package goinsta
 
 import (
 	"bytes"
@@ -12,6 +12,9 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	// "github.com/tducasse/goinsta"
+	// "github.com/tducasse/goinsta"
+	// "..//goinsta"
 )
 
 // Secret is main struct for strore functions

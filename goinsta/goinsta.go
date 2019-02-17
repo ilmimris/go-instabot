@@ -1,5 +1,5 @@
 // goinsta project goinsta.go
-package main
+package goinsta
 
 import (
 	"bytes"
@@ -17,6 +17,9 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	response "./response"
+	// "./response"
 )
 
 // GetSessions return current instagram session and cookies
@@ -161,8 +164,8 @@ func (insta *Instagram) Login() error {
 	}
 
 	var Result struct {
-		LoggedInUser User   `json:"logged_in_user"`
-		Status       string `json:"status"`
+		LoggedInUser response.User `json:"logged_in_user"`
+		Status       string        `json:"status"`
 	}
 
 	err = json.Unmarshal(body, &Result)
@@ -194,7 +197,7 @@ func (insta *Instagram) Logout() error {
 
 // UserFollowing return followings of specific user
 // skip maxid with empty string for get first page
-func (insta *Instagram) UserFollowing(userID int64, maxID string) (UsersResponse, error) {
+func (insta *Instagram) UserFollowing(userID int64, maxID string) (response.UsersResponse, error) {
 	body, err := insta.sendRequest(&reqOptions{
 		Endpoint: fmt.Sprintf("friendships/%d/following/", userID),
 		Query: map[string]string{
@@ -204,10 +207,10 @@ func (insta *Instagram) UserFollowing(userID int64, maxID string) (UsersResponse
 		},
 	})
 	if err != nil {
-		return UsersResponse{}, err
+		return response.UsersResponse{}, err
 	}
 
-	resp := UsersResponse{}
+	resp := response.UsersResponse{}
 	err = json.Unmarshal(body, &resp)
 
 	return resp, err
@@ -215,7 +218,7 @@ func (insta *Instagram) UserFollowing(userID int64, maxID string) (UsersResponse
 
 // UserFollowers return followers of specific user
 // skip maxid with empty string for get first page
-func (insta *Instagram) UserFollowers(userID int64, maxID string) (UsersResponse, error) {
+func (insta *Instagram) UserFollowers(userID int64, maxID string) (response.UsersResponse, error) {
 	body, err := insta.sendRequest(&reqOptions{
 		Endpoint: fmt.Sprintf("friendships/%d/followers/", userID),
 		Query: map[string]string{
@@ -225,29 +228,29 @@ func (insta *Instagram) UserFollowers(userID int64, maxID string) (UsersResponse
 		},
 	})
 	if err != nil {
-		return UsersResponse{}, err
+		return response.UsersResponse{}, err
 	}
 
-	resp := UsersResponse{}
+	resp := response.UsersResponse{}
 	err = json.Unmarshal(body, &resp)
 
 	return resp, err
 }
 
 // LatestFeed - Get the latest page of your own Instagram feed.
-func (insta *Instagram) LatestFeed() (UserFeedResponse, error) {
+func (insta *Instagram) LatestFeed() (response.UserFeedResponse, error) {
 	return insta.UserFeed(insta.LoggedInUser.ID, "", "")
 }
 
 // LatestUserFeed - Get the latest Instagram feed for the given user id
-func (insta *Instagram) LatestUserFeed(userID int64) (UserFeedResponse, error) {
+func (insta *Instagram) LatestUserFeed(userID int64) (response.UserFeedResponse, error) {
 	return insta.UserFeed(userID, "", "")
 }
 
 // UserFeed - Returns the Instagram feed for the given user id.
 // You can use maxID and minTimestamp for pagination, otherwise leave them empty to get the latest page only.
-func (insta *Instagram) UserFeed(userID int64, maxID, minTimestamp string) (UserFeedResponse, error) {
-	resp := UserFeedResponse{}
+func (insta *Instagram) UserFeed(userID int64, maxID, minTimestamp string) (response.UserFeedResponse, error) {
+	resp := response.UserFeedResponse{}
 
 	body, err := insta.sendRequest(&reqOptions{
 		Endpoint: fmt.Sprintf("feed/user/%d/", userID),
@@ -268,8 +271,8 @@ func (insta *Instagram) UserFeed(userID int64, maxID, minTimestamp string) (User
 }
 
 // UserTaggedFeed - Returns the feed for medua a given user is tagged in
-func (insta *Instagram) UserTaggedFeed(userID, maxID int64, minTimestamp string) (UserTaggedFeedResponse, error) {
-	resp := UserTaggedFeedResponse{}
+func (insta *Instagram) UserTaggedFeed(userID, maxID int64, minTimestamp string) (response.UserTaggedFeedResponse, error) {
+	resp := response.UserTaggedFeedResponse{}
 	maxid := ""
 	if maxID != 0 {
 		maxid = string(maxID)
@@ -295,8 +298,8 @@ func (insta *Instagram) UserTaggedFeed(userID, maxID int64, minTimestamp string)
 
 // MediaComments - Returns comments of a media, input is mediaid of a media
 // You can use maxID for pagination, otherwise leave it empty to get the latest page only.
-func (insta *Instagram) MediaComments(mediaID string, maxID string) (MediaCommentsResponse, error) {
-	resp := MediaCommentsResponse{}
+func (insta *Instagram) MediaComments(mediaID string, maxID string) (response.MediaCommentsResponse, error) {
+	resp := response.MediaCommentsResponse{}
 
 	body, err := insta.sendRequest(&reqOptions{
 		Endpoint: fmt.Sprintf("media/%s/comments", mediaID),
@@ -314,12 +317,12 @@ func (insta *Instagram) MediaComments(mediaID string, maxID string) (MediaCommen
 }
 
 // MediaLikers return likers of a media , input is mediaid of a media
-func (insta *Instagram) MediaLikers(mediaID string) (MediaLikersResponse, error) {
+func (insta *Instagram) MediaLikers(mediaID string) (response.MediaLikersResponse, error) {
 	body, err := insta.sendSimpleRequest("media/%s/likers/?", mediaID)
 	if err != nil {
-		return MediaLikersResponse{}, err
+		return response.MediaLikersResponse{}, err
 	}
-	resp := MediaLikersResponse{}
+	resp := response.MediaLikersResponse{}
 	err = json.Unmarshal(body, &resp)
 
 	return resp, err
@@ -377,7 +380,7 @@ func (insta *Instagram) MegaphoneLog() error {
 // Expose , expose instagram
 // return error if status was not 'ok' or runtime error
 func (insta *Instagram) Expose() error {
-	result := StatusResponse{}
+	result := response.StatusResponse{}
 	data, err := insta.prepareData(map[string]interface{}{
 		"id":         insta.LoggedInUser.ID,
 		"experiment": "ig_android_profile_contextual_feed",
@@ -400,8 +403,8 @@ func (insta *Instagram) Expose() error {
 }
 
 // MediaInfo return media information
-func (insta *Instagram) MediaInfo(mediaID string) (MediaInfoResponse, error) {
-	result := MediaInfoResponse{}
+func (insta *Instagram) MediaInfo(mediaID string) (response.MediaInfoResponse, error) {
+	result := response.MediaInfoResponse{}
 	data, err := insta.prepareData(map[string]interface{}{
 		"media_id": mediaID,
 	})
@@ -423,8 +426,8 @@ func (insta *Instagram) MediaInfo(mediaID string) (MediaInfoResponse, error) {
 }
 
 // SetPublicAccount Sets account to public
-func (insta *Instagram) SetPublicAccount() (ProfileDataResponse, error) {
-	result := ProfileDataResponse{}
+func (insta *Instagram) SetPublicAccount() (response.ProfileDataResponse, error) {
+	result := response.ProfileDataResponse{}
 	data, err := insta.prepareData()
 	if err != nil {
 		return result, err
@@ -444,8 +447,8 @@ func (insta *Instagram) SetPublicAccount() (ProfileDataResponse, error) {
 }
 
 // SetPrivateAccount Sets account to private
-func (insta *Instagram) SetPrivateAccount() (ProfileDataResponse, error) {
-	result := ProfileDataResponse{}
+func (insta *Instagram) SetPrivateAccount() (response.ProfileDataResponse, error) {
+	result := response.ProfileDataResponse{}
 	data, err := insta.prepareData()
 	if err != nil {
 		return result, err
@@ -465,8 +468,8 @@ func (insta *Instagram) SetPrivateAccount() (ProfileDataResponse, error) {
 }
 
 // GetProfileData return current user information
-func (insta *Instagram) GetProfileData() (ProfileDataResponse, error) {
-	result := ProfileDataResponse{}
+func (insta *Instagram) GetProfileData() (response.ProfileDataResponse, error) {
+	result := response.ProfileDataResponse{}
 	data, err := insta.prepareData()
 	if err != nil {
 		return result, err
@@ -489,8 +492,8 @@ func (insta *Instagram) GetProfileData() (ProfileDataResponse, error) {
 }
 
 // RemoveProfilePicture will remove current logged in user profile picture
-func (insta *Instagram) RemoveProfilePicture() (ProfileDataResponse, error) {
-	result := ProfileDataResponse{}
+func (insta *Instagram) RemoveProfilePicture() (response.ProfileDataResponse, error) {
+	result := response.ProfileDataResponse{}
 	data, err := insta.prepareData()
 	if err != nil {
 		return result, err
@@ -510,8 +513,8 @@ func (insta *Instagram) RemoveProfilePicture() (ProfileDataResponse, error) {
 }
 
 // GetuserID return information of a user by user ID
-func (insta *Instagram) GetUserByID(userID int64) (GetUsernameResponse, error) {
-	result := GetUsernameResponse{}
+func (insta *Instagram) GetUserByID(userID int64) (response.GetUsernameResponse, error) {
+	result := response.GetUsernameResponse{}
 	data, err := insta.prepareData()
 	if err != nil {
 		return result, err
@@ -530,22 +533,22 @@ func (insta *Instagram) GetUserByID(userID int64) (GetUsernameResponse, error) {
 }
 
 // GetUsername return information of a user by username
-func (insta *Instagram) GetUserByUsername(username string) (GetUsernameResponse, error) {
+func (insta *Instagram) GetUserByUsername(username string) (response.GetUsernameResponse, error) {
 	body, err := insta.sendSimpleRequest("users/%s/usernameinfo/", username)
 	if err != nil {
-		return GetUsernameResponse{}, err
+		return response.GetUsernameResponse{}, err
 	}
 
-	resp := GetUsernameResponse{}
+	resp := response.GetUsernameResponse{}
 	err = json.Unmarshal(body, &resp)
 
 	return resp, err
 }
 
 // SearchLocation return search location by lat & lng & search query in instagram
-func (insta *Instagram) SearchLocation(lat, lng, search string) (SearchLocationResponse, error) {
+func (insta *Instagram) SearchLocation(lat, lng, search string) (response.SearchLocationResponse, error) {
 	if lat == "" || lng == "" {
-		return SearchLocationResponse{}, fmt.Errorf("lat & lng must not be empty")
+		return response.SearchLocationResponse{}, fmt.Errorf("lat & lng must not be empty")
 	}
 
 	query := map[string]string{
@@ -566,16 +569,16 @@ func (insta *Instagram) SearchLocation(lat, lng, search string) (SearchLocationR
 	})
 
 	if err != nil {
-		return SearchLocationResponse{}, err
+		return response.SearchLocationResponse{}, err
 	}
 
-	resp := SearchLocationResponse{}
+	resp := response.SearchLocationResponse{}
 	err = json.Unmarshal(body, &resp)
 	return resp, err
 }
 
 // GetLocationFeed return location feed data by locationID in Instagram
-func (insta *Instagram) GetLocationFeed(locationID int64, maxID string) (LocationFeedResponse, error) {
+func (insta *Instagram) GetLocationFeed(locationID int64, maxID string) (response.LocationFeedResponse, error) {
 	body, err := insta.sendRequest(&reqOptions{
 		Endpoint: fmt.Sprintf("feed/location/%d/", locationID),
 		Query: map[string]string{
@@ -583,16 +586,16 @@ func (insta *Instagram) GetLocationFeed(locationID int64, maxID string) (Locatio
 		},
 	})
 	if err != nil {
-		return LocationFeedResponse{}, err
+		return response.LocationFeedResponse{}, err
 	}
 
-	resp := LocationFeedResponse{}
+	resp := response.LocationFeedResponse{}
 	err = json.Unmarshal(body, &resp)
 	return resp, err
 }
 
 // GetTagRelated can get related tags by tags in instagram
-func (insta *Instagram) GetTagRelated(tag string) (TagRelatedResponse, error) {
+func (insta *Instagram) GetTagRelated(tag string) (response.TagRelatedResponse, error) {
 	body, err := insta.sendRequest(&reqOptions{
 		Endpoint: fmt.Sprintf("tags/%s/related", tag),
 		Query: map[string]string{
@@ -602,15 +605,15 @@ func (insta *Instagram) GetTagRelated(tag string) (TagRelatedResponse, error) {
 	})
 
 	if err != nil {
-		return TagRelatedResponse{}, err
+		return response.TagRelatedResponse{}, err
 	}
-	resp := TagRelatedResponse{}
+	resp := response.TagRelatedResponse{}
 	err = json.Unmarshal(body, &resp)
 	return resp, err
 }
 
 // TagFeed search by tags in instagram
-func (insta *Instagram) TagFeed(tag string) (TagFeedsResponse, error) {
+func (insta *Instagram) TagFeed(tag string) (response.TagFeedsResponse, error) {
 	body, err := insta.sendRequest(&reqOptions{
 		Endpoint: fmt.Sprintf("feed/tag/%s/", tag),
 		Query: map[string]string{
@@ -619,17 +622,17 @@ func (insta *Instagram) TagFeed(tag string) (TagFeedsResponse, error) {
 		},
 	})
 	if err != nil {
-		return TagFeedsResponse{}, err
+		return response.TagFeedsResponse{}, err
 	}
 
-	resp := TagFeedsResponse{}
+	resp := response.TagFeedsResponse{}
 	err = json.Unmarshal(body, &resp)
 
 	return resp, err
 }
 
 // UploadPhotoFromReader can upload your photo stored in io.Reader with any quality , better to use 87
-func (insta *Instagram) UploadPhotoFromReader(photo io.Reader, photo_caption string, upload_id int64, quality int, filter_type int) (UploadPhotoResponse, error) {
+func (insta *Instagram) UploadPhotoFromReader(photo io.Reader, photo_caption string, upload_id int64, quality int, filter_type int) (response.UploadPhotoResponse, error) {
 	photo_name := fmt.Sprintf("pending_media_%d.jpg", upload_id)
 
 	//multipart request body
@@ -643,7 +646,7 @@ func (insta *Instagram) UploadPhotoFromReader(photo io.Reader, photo_caption str
 
 	fw, err := w.CreateFormFile("photo", photo_name)
 	if err != nil {
-		return UploadPhotoResponse{}, err
+		return response.UploadPhotoResponse{}, err
 	}
 
 	var buf bytes.Buffer
@@ -651,16 +654,16 @@ func (insta *Instagram) UploadPhotoFromReader(photo io.Reader, photo_caption str
 	rdr := io.TeeReader(photo, &buf)
 
 	if _, err = io.Copy(fw, rdr); err != nil {
-		return UploadPhotoResponse{}, err
+		return response.UploadPhotoResponse{}, err
 	}
 	if err := w.Close(); err != nil {
-		return UploadPhotoResponse{}, err
+		return response.UploadPhotoResponse{}, err
 	}
 
 	//making post request
 	req, err := http.NewRequest("POST", GOINSTA_API_URL+"upload/photo/", &b)
 	if err != nil {
-		return UploadPhotoResponse{}, err
+		return response.UploadPhotoResponse{}, err
 	}
 	req.Header.Set("X-IG-Capabilities", "3Q4=")
 	req.Header.Set("X-IG-Connection-Type", "WIFI") // cool header :smile:
@@ -676,29 +679,29 @@ func (insta *Instagram) UploadPhotoFromReader(photo io.Reader, photo_caption str
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return UploadPhotoResponse{}, err
+		return response.UploadPhotoResponse{}, err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return UploadPhotoResponse{}, err
+		return response.UploadPhotoResponse{}, err
 	}
 
 	if resp.StatusCode != 200 {
-		return UploadPhotoResponse{}, fmt.Errorf("invalid status code" + resp.Status)
+		return response.UploadPhotoResponse{}, fmt.Errorf("invalid status code" + resp.Status)
 	}
 
-	up := UploadResponse{}
-	err = json.Unmarshal(body, &up)
+	upresponse := response.UploadResponse{}
+	err = json.Unmarshal(body, &upresponse)
 	if err != nil {
-		return UploadPhotoResponse{}, err
+		return response.UploadPhotoResponse{}, err
 	}
 
-	if up.Status == "ok" {
+	if upresponse.Status == "ok" {
 		w, h, err := getImageDimensionFromReader(&buf)
 		if err != nil {
-			return UploadPhotoResponse{}, err
+			return response.UploadPhotoResponse{}, err
 		}
 
 		config := map[string]interface{}{
@@ -720,7 +723,7 @@ func (insta *Instagram) UploadPhotoFromReader(photo io.Reader, photo_caption str
 		}
 		data, err := insta.prepareData(config)
 		if err != nil {
-			return UploadPhotoResponse{}, err
+			return response.UploadPhotoResponse{}, err
 		}
 
 		body, err = insta.sendRequest(&reqOptions{
@@ -728,23 +731,23 @@ func (insta *Instagram) UploadPhotoFromReader(photo io.Reader, photo_caption str
 			PostData: generateSignature(data),
 		})
 		if err != nil {
-			return UploadPhotoResponse{}, err
+			return response.UploadPhotoResponse{}, err
 		}
 
-		uploadresponse := UploadPhotoResponse{}
+		uploadresponse := response.UploadPhotoResponse{}
 		err = json.Unmarshal(body, &uploadresponse)
 
 		return uploadresponse, err
 	} else {
-		return UploadPhotoResponse{}, fmt.Errorf(up.Status)
+		return response.UploadPhotoResponse{}, fmt.Errorf(upresponse.Status)
 	}
 }
 
 // UploadPhoto can upload your photo file, stored in filesystem with any quality , better to use 87
-func (insta *Instagram) UploadPhoto(photo_path string, photo_caption string, upload_id int64, quality int, filter_type int) (UploadPhotoResponse, error) {
+func (insta *Instagram) UploadPhoto(photo_path string, photo_caption string, upload_id int64, quality int, filter_type int) (response.UploadPhotoResponse, error) {
 	f, err := os.Open(photo_path)
 	if err != nil {
-		return UploadPhotoResponse{}, err
+		return response.UploadPhotoResponse{}, err
 	}
 	defer f.Close()
 
@@ -757,8 +760,8 @@ func (insta *Instagram) NewUploadID() int64 {
 }
 
 // Follow one of instagram users with userID , you can find userID in GetUsername
-func (insta *Instagram) Follow(userID int64) (FollowResponse, error) {
-	resp := FollowResponse{}
+func (insta *Instagram) Follow(userID int64) (response.FollowResponse, error) {
+	resp := response.FollowResponse{}
 	data, err := insta.prepareData(map[string]interface{}{
 		"user_id": userID,
 	})
@@ -780,8 +783,8 @@ func (insta *Instagram) Follow(userID int64) (FollowResponse, error) {
 }
 
 // UnFollow one of instagram users with userID , you can find userID in GetUsername
-func (insta *Instagram) UnFollow(userID int64) (UnFollowResponse, error) {
-	resp := UnFollowResponse{}
+func (insta *Instagram) UnFollow(userID int64) (response.UnFollowResponse, error) {
+	resp := response.UnFollowResponse{}
 	data, err := insta.prepareData(map[string]interface{}{
 		"user_id": userID,
 	})
@@ -956,8 +959,8 @@ func (insta *Instagram) GetRecentRecipients() ([]byte, error) {
 	return insta.sendSimpleRequest("direct_share/recent_recipients/")
 }
 
-func (insta *Instagram) GetV2Inbox(cursor string) (DirectListResponse, error) {
-	result := DirectListResponse{}
+func (insta *Instagram) GetV2Inbox(cursor string) (response.DirectListResponse, error) {
+	result := response.DirectListResponse{}
 
 	body, err := insta.sendRequest(&reqOptions{
 		Endpoint: "direct_v2/inbox/",
@@ -973,8 +976,8 @@ func (insta *Instagram) GetV2Inbox(cursor string) (DirectListResponse, error) {
 	return result, err
 }
 
-func (insta *Instagram) GetDirectPendingRequests() (DirectPendingRequests, error) {
-	result := DirectPendingRequests{}
+func (insta *Instagram) GetDirectPendingRequests() (response.DirectPendingRequests, error) {
+	result := response.DirectPendingRequests{}
 	body, err := insta.sendSimpleRequest("direct_v2/pending_inbox/?")
 	if err != nil {
 		return result, err
@@ -984,8 +987,8 @@ func (insta *Instagram) GetDirectPendingRequests() (DirectPendingRequests, error
 	return result, err
 }
 
-func (insta *Instagram) GetRankedRecipients() (DirectRankedRecipients, error) {
-	result := DirectRankedRecipients{}
+func (insta *Instagram) GetRankedRecipients() (response.DirectRankedRecipients, error) {
+	result := response.DirectRankedRecipients{}
 	body, err := insta.sendSimpleRequest("direct_v2/ranked_recipients/?")
 	if err != nil {
 		return result, err
@@ -995,8 +998,8 @@ func (insta *Instagram) GetRankedRecipients() (DirectRankedRecipients, error) {
 	return result, err
 }
 
-func (insta *Instagram) GetDirectThread(threadid string) (DirectThread, error) {
-	result := DirectThread{}
+func (insta *Instagram) GetDirectThread(threadid string) (response.DirectThread, error) {
+	result := response.DirectThread{}
 	body, err := insta.sendSimpleRequest("direct_v2/threads/%s/", threadid)
 	if err != nil {
 		return result, err
@@ -1006,8 +1009,8 @@ func (insta *Instagram) GetDirectThread(threadid string) (DirectThread, error) {
 	return result, err
 }
 
-func (insta *Instagram) Explore() (ExploreResponse, error) {
-	result := ExploreResponse{}
+func (insta *Instagram) Explore() (response.ExploreResponse, error) {
+	result := response.ExploreResponse{}
 	body, err := insta.sendSimpleRequest("discover/explore/")
 	if err != nil {
 		return result, err
@@ -1037,7 +1040,7 @@ func (insta *Instagram) ChangePassword(newpassword string) ([]byte, error) {
 	return bytes, err
 }
 
-func (insta *Instagram) Timeline(maxID string) (r FeedsResponse, err error) {
+func (insta *Instagram) Timeline(maxID string) (r response.FeedsResponse, err error) {
 	data, err := insta.sendRequest(&reqOptions{
 		Endpoint: "feed/timeline/",
 		Query: map[string]string{
@@ -1073,28 +1076,28 @@ func getImageDimension(imagePath string) (int, int, error) {
 	return getImageDimensionFromReader(file)
 }
 
-func (insta *Instagram) SelfUserFollowers(maxID string) (UsersResponse, error) {
+func (insta *Instagram) SelfUserFollowers(maxID string) (response.UsersResponse, error) {
 	return insta.UserFollowers(insta.LoggedInUser.ID, maxID)
 }
 
-func (insta *Instagram) SelfUserFollowing(maxID string) (UsersResponse, error) {
+func (insta *Instagram) SelfUserFollowing(maxID string) (response.UsersResponse, error) {
 	return insta.UserFollowing(insta.LoggedInUser.ID, maxID)
 }
 
-func (insta *Instagram) SelfTotalUserFollowing() (UsersResponse, error) {
+func (insta *Instagram) SelfTotalUserFollowing() (response.UsersResponse, error) {
 	return insta.TotalUserFollowing(insta.LoggedInUser.ID)
 }
 
-func (insta *Instagram) SelfTotalUserFollowers() (UsersResponse, error) {
+func (insta *Instagram) SelfTotalUserFollowers() (response.UsersResponse, error) {
 	return insta.TotalUserFollowers(insta.LoggedInUser.ID)
 }
 
-func (insta *Instagram) TotalUserFollowing(userID int64) (UsersResponse, error) {
-	resp := UsersResponse{}
+func (insta *Instagram) TotalUserFollowing(userID int64) (response.UsersResponse, error) {
+	resp := response.UsersResponse{}
 	for {
 		temp_resp, err := insta.UserFollowing(userID, resp.NextMaxID)
 		if err != nil {
-			return UsersResponse{}, err
+			return response.UsersResponse{}, err
 		}
 		resp.Users = append(resp.Users, temp_resp.Users...)
 		resp.PageSize += temp_resp.PageSize
@@ -1106,12 +1109,12 @@ func (insta *Instagram) TotalUserFollowing(userID int64) (UsersResponse, error) 
 	}
 }
 
-func (insta *Instagram) TotalUserFollowers(userID int64) (UsersResponse, error) {
-	resp := UsersResponse{}
+func (insta *Instagram) TotalUserFollowers(userID int64) (response.UsersResponse, error) {
+	resp := response.UsersResponse{}
 	for {
 		temp_resp, err := insta.UserFollowers(userID, resp.NextMaxID)
 		if err != nil {
-			return UsersResponse{}, err
+			return response.UsersResponse{}, err
 		}
 		resp.Users = append(resp.Users, temp_resp.Users...)
 		resp.PageSize += temp_resp.PageSize
@@ -1123,8 +1126,8 @@ func (insta *Instagram) TotalUserFollowers(userID int64) (UsersResponse, error) 
 	}
 }
 
-func (insta *Instagram) GetRecentActivity() (RecentActivityResponse, error) {
-	result := RecentActivityResponse{}
+func (insta *Instagram) GetRecentActivity() (response.RecentActivityResponse, error) {
+	result := response.RecentActivityResponse{}
 	bytes, err := insta.sendSimpleRequest("news/inbox/?")
 	if err != nil {
 		return result, err
@@ -1136,8 +1139,8 @@ func (insta *Instagram) GetRecentActivity() (RecentActivityResponse, error) {
 	return result, nil
 }
 
-func (insta *Instagram) GetFollowingRecentActivity() (FollowingRecentActivityResponse, error) {
-	result := FollowingRecentActivityResponse{}
+func (insta *Instagram) GetFollowingRecentActivity() (response.FollowingRecentActivityResponse, error) {
+	result := response.FollowingRecentActivityResponse{}
 	bytes, err := insta.sendSimpleRequest("news/?")
 	if err != nil {
 		return result, err
@@ -1149,8 +1152,8 @@ func (insta *Instagram) GetFollowingRecentActivity() (FollowingRecentActivityRes
 	return result, nil
 }
 
-func (insta *Instagram) SearchUsername(query string) (SearchUserResponse, error) {
-	result := SearchUserResponse{}
+func (insta *Instagram) SearchUsername(query string) (response.SearchUserResponse, error) {
+	result := response.SearchUserResponse{}
 	body, err := insta.sendRequest(&reqOptions{
 		Endpoint: "users/search/",
 		Query: map[string]string{
@@ -1169,8 +1172,8 @@ func (insta *Instagram) SearchUsername(query string) (SearchUserResponse, error)
 	return result, err
 }
 
-func (insta *Instagram) SearchTags(query string) (SearchTagsResponse, error) {
-	result := SearchTagsResponse{}
+func (insta *Instagram) SearchTags(query string) (response.SearchTagsResponse, error) {
+	result := response.SearchTagsResponse{}
 	body, err := insta.sendRequest(&reqOptions{
 		Endpoint: "tags/search/",
 		Query: map[string]string{
@@ -1200,8 +1203,8 @@ func (insta *Instagram) SearchFacebookUsers(query string) ([]byte, error) {
 
 // DirectMessage sends direct message to recipient.
 // Recipient must be user id.
-func (insta *Instagram) DirectMessage(recipient string, message string) (DirectMessageResponse, error) {
-	result := DirectMessageResponse{}
+func (insta *Instagram) DirectMessage(recipient string, message string) (response.DirectMessageResponse, error) {
+	result := response.DirectMessageResponse{}
 	recipients, err := json.Marshal([][]string{{recipient}})
 	if err != nil {
 		return result, err
@@ -1247,21 +1250,21 @@ func (insta *Instagram) DirectMessage(recipient string, message string) (DirectM
 }
 
 // GetTrayFeeds - Get all available Instagram stories of your friends
-func (insta *Instagram) GetReelsTrayFeed() (TrayResponse, error) {
+func (insta *Instagram) GetReelsTrayFeed() (response.TrayResponse, error) {
 	bytes, err := insta.sendSimpleRequest("feed/reels_tray/")
 	if err != nil {
-		return TrayResponse{}, err
+		return response.TrayResponse{}, err
 	}
 
-	result := TrayResponse{}
+	result := response.TrayResponse{}
 	json.Unmarshal([]byte(bytes), &result)
 
 	return result, nil
 }
 
 // GetUserStories - Get all available Instagram stories for the given user id
-func (insta *Instagram) GetUserStories(userID int64) (StoryResponse, error) {
-	result := StoryResponse{}
+func (insta *Instagram) GetUserStories(userID int64) (response.StoryResponse, error) {
+	result := response.StoryResponse{}
 	if userID == 0 {
 		return result, nil
 	}
@@ -1276,8 +1279,8 @@ func (insta *Instagram) GetUserStories(userID int64) (StoryResponse, error) {
 	return result, nil
 }
 
-func (insta *Instagram) UserFriendShip(userID int64) (UserFriendShipResponse, error) {
-	result := UserFriendShipResponse{}
+func (insta *Instagram) UserFriendShip(userID int64) (response.UserFriendShipResponse, error) {
+	result := response.UserFriendShipResponse{}
 	data, err := insta.prepareData(map[string]interface{}{
 		"user_id": userID,
 	})
@@ -1300,8 +1303,8 @@ func (insta *Instagram) UserFriendShip(userID int64) (UserFriendShipResponse, er
 	return result, err
 }
 
-func (insta *Instagram) GetPopularFeed() (GetPopularFeedResponse, error) {
-	result := GetPopularFeedResponse{}
+func (insta *Instagram) GetPopularFeed() (response.GetPopularFeedResponse, error) {
+	result := response.GetPopularFeedResponse{}
 	bytes, err := insta.sendRequest(&reqOptions{
 		Endpoint: "feed/popular/",
 		Query: map[string]string{
