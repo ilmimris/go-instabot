@@ -1,4 +1,4 @@
-package goinsta
+package main
 
 import (
 	"bytes"

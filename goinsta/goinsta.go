@@ -1,5 +1,5 @@
 // goinsta project goinsta.go
-package goinsta
+package main
 
 import (
 	"bytes"

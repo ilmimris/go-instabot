@@ -14,8 +14,10 @@ import (
 	"time"
 
 	"github.com/ad/cron"
-	goinsta "github.com/ad/go-instabot/goinsta"
+
 	response "github.com/ad/go-instabot/goinsta/response"
+
+	"github.com/ad/go-instabot/goinsta"
 
 	"github.com/boltdb/bolt"
 	"github.com/spf13/viper"
