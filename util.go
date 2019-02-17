@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"./goinsta/response"
+	response "github.com/ad/go-instabot/goinsta/response"
 	"github.com/spf13/viper"
 
 	tgbotapi "gopkg.in/telegram-bot-api.v4"

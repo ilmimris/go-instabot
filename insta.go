@@ -15,9 +15,9 @@ import (
 
 	"github.com/ad/cron"
 
-	"./goinsta/response"
+	response "github.com/ad/go-instabot/goinsta/response"
 
-	"./goinsta"
+	"github.com/ad/go-instabot/goinsta"
 
 	"github.com/boltdb/bolt"
 	"github.com/spf13/viper"
