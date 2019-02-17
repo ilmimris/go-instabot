@@ -15,9 +15,9 @@ import (
 
 	"github.com/ad/cron"
 
-	"./goinsta/response"
-
-	"./goinsta"
+	"github.com/tducasse/goinsta"
+	"github.com/tducasse/goinsta/response"
+	"github.com/tducasse/goinsta/store"
 
 	"github.com/boltdb/bolt"
 	"github.com/spf13/viper"
@@ -489,7 +489,7 @@ func createAndSaveSession() {
 	check(err)
 
 	key := createKey()
-	bytes, err := goinsta.Export(insta, key)
+	bytes, err := store.Export(insta, key)
 	check(err)
 	err = ioutil.WriteFile("session", bytes, 0644)
 	check(err)
@@ -509,7 +509,7 @@ func reloadSession() error {
 	key, err := ioutil.ReadFile("key")
 	check(err)
 
-	insta, err = goinsta.Import(session, key)
+	insta, err = store.Import(session, key)
 	if err != nil {
 		return errors.New("Couldn't recover the session")
 	}
@@ -743,12 +743,9 @@ func goThrough(tag string, db *bolt.DB, images response.TagFeedsResponse, stopCh
 			// log.Println("from cache " + posterInfo.User.Username + " - for #" + tag)
 		} else {
 			err := retry(10, 20*time.Second, func() (err error) {
-
-				posterInfo, err = insta.GetUserByUsername(images.FeedsResponse.Items[index].User.Username)
+				posterInfo, err = insta.GetUserByID(images.FeedsResponse.Items[index].User.ID)
 				if err == nil {
 					usersInfo[images.FeedsResponse.Items[index].User.Username] = posterInfo
-				} else {
-					log.Println(err)
 				}
 				return
 			})

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"./goinsta/response"
 	"github.com/spf13/viper"
+	"github.com/tducasse/goinsta/response"
 
 	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )
@@ -65,7 +65,7 @@ var numCommented int
 // check will log.Fatal if err is an error
 func check(err error) {
 	if err != nil {
-		log.Println("ERROR:", err)
+		log.Fatal("ERROR:", err)
 	}
 }
 
