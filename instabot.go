@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/ad/cron"
@@ -45,6 +46,8 @@ var (
 	cronUnfollow int
 	cronStats    int
 	cronLike     int
+
+	l sync.RWMutex
 )
 var db *bolt.DB
 
@@ -179,7 +182,9 @@ func main() {
 					msg.Text = fmt.Sprintf("Unfollow — %s\nFollow — %s\nRefollow — %s\nfollowLikers - %s", unfollowProgress, followProgress, refollowProgress, followLikersProgress)
 					msgRes, err := bot.Send(msg)
 					if err != nil {
+						l.Lock()
 						editMessage["progress"][update.Message.From.ID] = msgRes.MessageID
+						l.Unlock()
 					}
 				case "cancelfollow":
 					if followIsStarted.IsSet() {
@@ -232,8 +237,14 @@ func main() {
 		case resp := <-telegramResp:
 			log.Println(resp.key, resp.body)
 			if resp.key != "" {
-				if len(editMessage[resp.key]) > 0 {
-					for UserID, EditID := range editMessage[resp.key] {
+				l.RLock()
+				ln := len(editMessage[resp.key])
+				l.RUnlock()
+				if ln > 0 {
+					l.RLock()
+					rn := editMessage[resp.key]
+					l.RUnlock()
+					for UserID, EditID := range rn {
 						edit := tgbotapi.EditMessageTextConfig{
 							BaseEdit: tgbotapi.BaseEdit{
 								ChatID:    int64(UserID),
@@ -247,7 +258,9 @@ func main() {
 					msg := tgbotapi.NewMessage(reportID, resp.body)
 					msgRes, err := bot.Send(msg)
 					if err == nil {
+						l.Lock()
 						editMessage[resp.key][int(reportID)] = msgRes.MessageID
+						l.Unlock()
 					}
 				}
 			}
