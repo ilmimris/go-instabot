@@ -109,7 +109,7 @@ func main() {
 	}
 
 	go func() {
-		sigchan := make(chan os.Signal)
+		sigchan := make(chan os.Signal, 10)
 		signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGQUIT)
 		<-sigchan
 
