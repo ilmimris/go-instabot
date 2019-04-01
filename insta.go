@@ -641,7 +641,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						current++
 
 						l.Lock()
-						state["follow"] = int((current - 1) * 100 / allCount)
+						state["follow"] = int(current * 100 / allCount)
 						state["follow_current"] = current
 						state["follow_all_count"] = allCount
 						l.Unlock()
