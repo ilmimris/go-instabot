@@ -498,7 +498,6 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			}
 
 			l.Lock()
-			editMessage["unfollow"] = make(map[int]int)
 			state["unfollow_current"] = 0
 			state["unfollow_all_count"] = 0
 			state["unfollow"] = -1
@@ -699,7 +698,6 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			telegramResp <- telegramResponse{reportAsString, "follow"}
 
 			l.Lock()
-			editMessage["follow"] = make(map[int]int)
 			state["follow"] = -1
 			reportAsString = ""
 			l.Unlock()
@@ -997,7 +995,12 @@ func startFollow(bot *tgbotapi.BotAPI, startChan chan bool, userID int64) {
 			}
 		}
 	} else {
+		l.Lock()
+		editMessage["follow"] = make(map[int]int)
+		l.Unlock()
+
 		startChan <- true
+
 		msg.Text = "Starting follow"
 		msgRes, err := bot.Send(msg)
 		if err == nil {
@@ -1039,7 +1042,12 @@ func startUnfollow(bot *tgbotapi.BotAPI, startChan chan bool, userID int64) {
 			}
 		}
 	} else {
+		l.Lock()
+		editMessage["unfollow"] = make(map[int]int)
+		l.Unlock()
+
 		startChan <- true
+
 		msg.Text = "Starting unfollow"
 		fmt.Println(msg.Text)
 		msgRes, err := bot.Send(msg)
