@@ -132,6 +132,11 @@ func getConfig() {
 	admins = viper.GetStringSlice("user.telegram.admins")
 
 	telegramToken = viper.GetString("user.telegram.token")
+	telegramProxy = viper.GetString("user.telegram.proxy")
+	telegramProxyPort = viper.GetInt32("user.telegram.proxy_port")
+	telegramProxyUser = viper.GetString("user.telegram.proxy_user")
+	telegramProxyPassword = viper.GetString("user.telegram.proxy_password")
+
 	instaUsername = viper.GetString("user.instagram.username")
 	instaPassword = viper.GetString("user.instagram.password")
 
