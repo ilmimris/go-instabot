@@ -45,6 +45,7 @@ var (
 
 	instaUsername string
 	instaPassword string
+	instaProxy    string
 
 	commandKeyboard tgbotapi.ReplyKeyboardMarkup
 

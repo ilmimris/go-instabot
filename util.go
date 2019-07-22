@@ -139,6 +139,7 @@ func getConfig() {
 
 	instaUsername = viper.GetString("user.instagram.username")
 	instaPassword = viper.GetString("user.instagram.password")
+	instaProxy = viper.GetString("user.instagram.proxy")
 
 	report = make(map[string]map[string]int)
 }

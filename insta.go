@@ -513,6 +513,10 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 // Logins and saves the session
 func createAndSaveSession() {
 	insta = goinsta.New(instaUsername, instaPassword)
+	if instaProxy != "" {
+		insta.Proxy = instaProxy
+	}
+
 	err := insta.Login()
 	check(err)
 
