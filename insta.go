@@ -478,10 +478,14 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 
 						telegramResp <- telegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], users[index].Username, state["unfollow"]), "unfollow"}
 						if !*dev {
-							insta.UnFollow(users[index].ID)
-							setFollowed(db, users[index].Username)
-							incStats(db, "unfollow")
-							time.Sleep(16 * time.Second)
+							err := insta.UnFollow(users[index].ID)
+							if err != nil {
+								fmt.Printf("can't unfollow %s (error: %s)", users[index].Username, err)
+							} else {
+								setFollowed(db, users[index].Username)
+								incStats(db, "unfollow")
+								time.Sleep(16 * time.Second)
+							}
 						} else {
 							time.Sleep(2 * time.Second)
 						}
