@@ -481,9 +481,11 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 							_, err := insta.UnFollow(users[index].ID)
 							if err != nil {
 								fmt.Printf("can't unfollow %s (error: %s)", users[index].Username, err)
+								time.Sleep(60 * time.Second)
 							} else {
 								setFollowed(db, users[index].Username)
 								incStats(db, "unfollow")
+								
 								time.Sleep(16 * time.Second)
 							}
 						} else {
