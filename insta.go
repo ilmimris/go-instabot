@@ -37,7 +37,7 @@ var reportAsString string
 func login() {
 	err := reloadSession()
 	if err != nil {
-		createAndSaveSession()
+		err = createAndSaveSession()
 	}
 }
 
@@ -485,7 +485,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 							} else {
 								setFollowed(db, users[index].Username)
 								incStats(db, "unfollow")
-								
+
 								time.Sleep(16 * time.Second)
 							}
 						} else {
@@ -517,21 +517,25 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 }
 
 // Logins and saves the session
-func createAndSaveSession() {
+func createAndSaveSession() error {
 	insta = goinsta.New(instaUsername, instaPassword)
 	if instaProxy != "" {
 		insta.Proxy = instaProxy
 	}
 
 	err := insta.Login()
-	check(err)
-
-	key := createKey()
-	bytes, err := store.Export(insta, key)
-	check(err)
-	err = ioutil.WriteFile("session", bytes, 0644)
-	check(err)
-	log.Println("Created and saved the session")
+	if err == nil {
+		key := createKey()
+		bytes, err := store.Export(insta, key)
+		if err == nil {
+			err = ioutil.WriteFile("session", bytes, 0644)
+			if err == nil {
+				log.Println("Created and saved the session")
+				return nil
+			}
+		}
+	}
+	return err
 }
 
 // reloadSession will attempt to recover a previous session

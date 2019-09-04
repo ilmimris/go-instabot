@@ -173,7 +173,14 @@ func main() {
 				msg.DisableNotification = true
 
 				switch command {
-
+				case "relogin":
+					err = createAndSaveSession()
+					if err != nil {
+						msg.Text = fmt.Sprintf("relogin failed with error %s", err)
+					} else {
+						msg.Text = fmt.Sprintf("relogin done")
+					}
+					bot.Send(msg)
 				case "refollow":
 					if args == "" {
 						msg.Text = fmt.Sprintf("/refollow username")
