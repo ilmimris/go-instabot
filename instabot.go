@@ -263,6 +263,8 @@ func main() {
 					getLimits(bot, int64(update.Message.From.ID))
 				case "updatelimits":
 					updateLimits(bot, args, int64(update.Message.From.ID))
+				case "updateproxy":
+					updateProxy(bot, args, int64(update.Message.From.ID))
 				case "like":
 					likeFollowersPosts(db)
 				default:

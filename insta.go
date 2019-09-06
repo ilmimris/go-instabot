@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -1198,13 +1199,7 @@ Followed — %d
 	Refollowed — %d
 	Followed likers — %d
 Liked — %d
-Commented — %d
-
-<b>Cron status</b>
-follow %s
-unfollow %s
-like %s
-stats %s`
+Commented — %d`
 
 	unfollowCount, _ := getStats(db, "unfollow")
 	followCount, _ := getStats(db, "follow")
@@ -1223,10 +1218,10 @@ stats %s`
 		followLikersCount,
 		likeCount,
 		commentCount,
-		getJobState(c, cronFollow),
-		getJobState(c, cronUnfollow),
-		getJobState(c, cronStats),
-		getJobState(c, cronLike),
+		// getJobState(c, cronFollow),
+		// getJobState(c, cronUnfollow),
+		// getJobState(c, cronStats),
+		// getJobState(c, cronLike),
 	))
 
 	msg.DisableWebPagePreview = true
@@ -1452,6 +1447,42 @@ func updateLimits(bot *tgbotapi.BotAPI, limitStr string, userID int64) {
 	}
 
 	bot.Send(msg)
+}
+
+func updateProxy(bot *tgbotapi.BotAPI, proxyStr string, userID int64) {
+	msg := tgbotapi.NewMessage(userID, "")
+
+	if proxyStr == "" {
+		viper.Set("user.instagram.proxy", "")
+		viper.WriteConfig()
+	} else {
+		proxyURL, _ := url.Parse(proxyStr)
+
+		timeout := time.Duration(5 * time.Second)
+		httpClient := &http.Client{
+			Timeout: timeout,
+			Transport: &http.Transport{
+				DisableKeepAlives: true,
+				Proxy:             http.ProxyURL(proxyURL),
+			},
+		}
+		response, err := httpClient.Get("https://api.ipify.org?format=json")
+
+		if err != nil {
+			msg.Text = fmt.Sprintf("bad proxy: %s", err)
+			bot.Send(msg)
+		} else {
+			proxyStr := strings.TrimPrefix(proxyStr, "http://")
+			proxyStr := strings.TrimPrefix(proxyStr, "https://")
+
+			viper.Set("user.instagram.proxy", "http://"+proxyStr)
+			viper.WriteConfig()
+			msg.Text = "proxy updated, /relogin if needed"
+			bot.Send(msg)
+
+		}
+		defer response.Body.Close()
+	}
 }
 
 func getLastLikers() (result []string) {
