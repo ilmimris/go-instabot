@@ -1472,8 +1472,8 @@ func updateProxy(bot *tgbotapi.BotAPI, proxyStr string, userID int64) {
 			msg.Text = fmt.Sprintf("bad proxy: %s", err)
 			bot.Send(msg)
 		} else {
-			proxyStr := strings.TrimPrefix(proxyStr, "http://")
-			proxyStr := strings.TrimPrefix(proxyStr, "https://")
+			proxyStr = strings.TrimPrefix(proxyStr, "http://")
+			proxyStr = strings.TrimPrefix(proxyStr, "https://")
 
 			viper.Set("user.instagram.proxy", "http://"+proxyStr)
 			viper.WriteConfig()
