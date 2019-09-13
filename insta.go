@@ -369,10 +369,23 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 					return
 				}
 
-				following, _ := insta.SelfTotalUserFollowing()
-				// check(err)
-				followers, _ := insta.SelfTotalUserFollowers()
-				// check(err)
+				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, receiving following users"), "unfollow"}
+
+				following, err := insta.SelfTotalUserFollowing()
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, receiving followers (%d)", len(following.Users)), "unfollow"}
+				time.Sleep(30 * time.Second)
+
+				followers, err := insta.SelfTotalUserFollowers()
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, checking delay before unfollowed (%d/%d)", len(following.Users), len(followers.Users)), "unfollow"}
+				time.Sleep(30 * time.Second)
 
 				var daysBeforeUnfollow = viper.GetInt("limits.days_before_unfollow")
 				if daysBeforeUnfollow <= 0 || daysBeforeUnfollow >= 30 {
@@ -402,6 +415,9 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						}
 					}
 				}
+
+				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, checking last likers (%d)", len(users)), "unfollow"}
+				time.Sleep(30 * time.Second)
 
 				lastLikers := getLastLikers()
 				if len(lastLikers) > 0 {
@@ -441,6 +457,9 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						}
 					}
 				}
+
+				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow (%d)", len(users)), "unfollow"}
+				time.Sleep(30 * time.Second)
 
 				if limit <= 0 || limit >= 1000 {
 					limit = 1000
@@ -487,7 +506,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 								setFollowed(db, users[index].Username)
 								incStats(db, "unfollow")
 
-								time.Sleep(16 * time.Second)
+								time.Sleep(30 * time.Second)
 							}
 						} else {
 							time.Sleep(2 * time.Second)
@@ -499,7 +518,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 			}()
 		case <-stopChan:
 			if state["unfollow_current"] == 0 {
-				telegramResp <- telegramResponse{fmt.Sprintf("No one unfollow"), "unfollow"}
+				telegramResp <- telegramResponse{fmt.Sprintf("No one was unfollowed"), "unfollow"}
 			} else {
 				telegramResp <- telegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!", state["unfollow_current"]), "unfollow"}
 			}
