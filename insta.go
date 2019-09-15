@@ -803,7 +803,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						telegramResp <- telegramResponse{reportAsString, "follow"}
 						// browse(tag, db, stopChan)
 						feedTag, err := insta.Feed.Tags(tag)
-						feedTag.AutoLoadMoreEnabled = true
+						// feedTag.AutoLoadMoreEnabled = true
 						// feedTag.Next()
 						if err != nil {
 							log.Println(err)
