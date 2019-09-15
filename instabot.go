@@ -82,6 +82,8 @@ func main() {
 
 	go login()
 
+	defer insta.Logout()
+
 	telegramResp = make(chan telegramResponse)
 
 	startFollowChan, _, _, stopFollowChan := followManager(db)

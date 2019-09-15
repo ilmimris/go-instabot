@@ -14,7 +14,8 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"github.com/tducasse/goinsta/response"
+
+	"github.com/ahmdrz/goinsta/v2"
 
 	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )
@@ -240,9 +241,9 @@ func getInput(text string) string {
 }
 
 // Checks if the user is in the slice
-func contains(slice []response.User, user response.User) bool {
+func contains(slice []goinsta.User, user goinsta.User) bool {
 	for index := range slice {
-		if user == slice[index] {
+		if user.ID == slice[index].ID {
 			return true
 		}
 	}
