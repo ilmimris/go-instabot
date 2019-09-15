@@ -720,10 +720,10 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				followTestUsername := viper.GetString("user.instagram.follow_test_username")
 				if followTestUsername != "" {
 					user, err := insta.Profiles.ByName(followTestUsername)
-					user.Sync()
+					// user.Sync()
 					// user, err := insta.GetUserByUsername(followTestUsername)
 					if err != nil {
-						log.Println("test instagram username not found")
+						log.Printf("test instagram username (%s) not found", followTestUsername)
 					} else {
 						err := user.Follow() //insta.Follow(user.User.ID)
 						if err != nil {
@@ -732,9 +732,11 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 
 							stopChan <- true
 							return
+						} else {
+							log.Printf("test instagram username (%s) followed and unfollowed", user.Username)
 						}
-						user.Unfollow()
-						// insta.UnFollow(user.User.ID)
+						// 	user.Unfollow()
+						// 	// insta.UnFollow(user.User.ID)
 					}
 				}
 
@@ -801,182 +803,192 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						telegramResp <- telegramResponse{reportAsString, "follow"}
 						// browse(tag, db, stopChan)
 						feedTag, err := insta.Feed.Tags(tag)
+						feedTag.AutoLoadMoreEnabled = true
+						// feedTag.Next()
 						if err != nil {
 							log.Println(err)
 						} else {
+							// success := feedTag.Next()
+
+							// for feedTag.Next() {
+							// var i = 0
+							// for numFollowed < followCount || numLiked < likeCount || numCommented < commentCount {
+							if !followIsStarted.IsSet() {
+								stopChan <- true
+								return
+							}
+
+							log.Println("Fetching the list of images for #" + tag)
+							// i++
+
+							// Getting all the pictures we can on the first page
+							// Instagram will return a 500 sometimes, so we will retry 10 times.
+							// Check retry() for more info.
+
+							// tagFeed[tag] = append(tagFeed[tag], item)
+							// }
+							// var images, ok = tagFeed[tag]
+							// if ok {
+							// 	// log.Println("from cache #" + tag)
+							// } else {
+							// 	err := retry(10, 20*time.Second, func() (err error) {
+							// 		images, err = insta.TagFeed(tag)
+							// 		if err == nil {
+							// 			tagFeed[tag] = images
+							// 		}
+							// 		return
+							// 	})
+							// 	check(err)
+							// }
+
+							var l = 1
 							for _, item := range feedTag.Images {
-								var i = 0
-								for numFollowed < followCount || numLiked < likeCount || numCommented < commentCount {
-									if !followIsStarted.IsSet() {
-										stopChan <- true
-										return
-									}
-
-									log.Println("Fetching the list of images for #" + tag)
-									i++
-
-									// Getting all the pictures we can on the first page
-									// Instagram will return a 500 sometimes, so we will retry 10 times.
-									// Check retry() for more info.
-
-									// var images, ok = tagFeed[tag]
-									// if ok {
-									// 	// log.Println("from cache #" + tag)
-									// } else {
-									// 	err := retry(10, 20*time.Second, func() (err error) {
-									// 		images, err = insta.TagFeed(tag)
-									// 		if err == nil {
-									// 			tagFeed[tag] = images
-									// 		}
-									// 		return
-									// 	})
-									// 	check(err)
-									// }
-
-									var l = 1
-									// for index := range images.FeedsResponse.Items {
-									if !followIsStarted.IsSet() {
-										stopChan <- true
-										return
-									}
-									// Exiting the loop if there is nothing left to do
-									if numFollowed >= followCount && numLiked >= likeCount && numCommented >= commentCount {
-										break
-									}
-
-									// Skip our own images
-									if item.User.Username == instaUsername {
-										continue
-									}
-
-									// Check if we should fetch new images for tag
-									if l >= followCount && l >= likeCount && l >= commentCount {
-										break
-									}
-
-									if stringInStringSlice(item.User.Username, whiteList) {
-										log.Printf("Skip following %s, in white list\n", item.User.Username)
-										continue
-									}
-
-									// Getting the user info
-									// Instagram will return a 500 sometimes, so we will retry 10 times.
-									// Check retry() for more info.
-									var posterInfo, ok = usersInfo[item.User.Username]
-									if ok {
-										// log.Println("from cache " + posterInfo.User.Username + " - for #" + tag)
-									} else {
-										err := retry(10, 20*time.Second, func() (err error) {
-											posterNew, err := insta.Profiles.ByName(item.User.Username)
-											if err == nil {
-												usersInfo[item.User.Username] = *posterNew
-												posterInfo = *posterNew
-											}
-											return
-										})
-										check(err)
-									}
-
-									poster := posterInfo
-									followerCount := poster.FollowerCount
-									likesCount := item.Likes
-									commentsCount := item.CommentCount
-									followingCount := poster.FollowingCount
-
-									// Will only follow and comment if we like the picture
-									like := numLiked < likeCount && !item.HasLiked
-									follow := numFollowed < followCount && like
-									comment := numCommented < commentCount && like
-
-									var relationshipRatio float64 // = 0.0
-
-									if followerCount != 0 && followingCount != 0 {
-										relationshipRatio = float64(followingCount) / float64(followerCount)
-									}
-
-									// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
-
-									if follow {
-										if relationshipRatio == 0 || relationshipRatio < potencyRatio {
-											log.Printf("%s is not a potential user with the relationship ratio of %.2f (%d/%d) ~skipping user\n", poster.Username, relationshipRatio, followingCount, followerCount)
-											follow = false
-										} else {
-											log.Printf("%s with the relationship ratio of %.2f (%d/%d)\n", poster.Username, relationshipRatio, followingCount, followerCount)
-										}
-									}
-
-									// if followerCount > followUpperLimit {
-									// 	log.Printf("%s has %d followers, more than max %d\n", poster.Username, followerCount, followUpperLimit)
-									// 	follow = false
-									// } else if followerCount < followLowerLimit {
-									// 	log.Printf("%s has %d followers, less than min %d\n", poster.Username, followerCount, followLowerLimit)
-									// 	follow = false
-									// }
-
-									if likesCount > likeUpperLimit {
-										log.Printf("%s's image has %d likes, more than max %d\n", poster.Username, likesCount, likeUpperLimit)
-										like = false
-									} else if likesCount < likeLowerLimit {
-										log.Printf("%s's image has %d likes, less than min %d\n", poster.Username, likesCount, likeLowerLimit)
-										like = false
-									}
-
-									if commentsCount > commentUpperLimit {
-										log.Printf("%s's image has %d comments, more than max %d\n", poster.Username, commentsCount, commentUpperLimit)
-										comment = false
-									} else if commentsCount < commentLowerLimit {
-										log.Printf("%s's image has %d comments, less than min %d\n", poster.Username, commentsCount, commentLowerLimit)
-										comment = false
-									}
-
-									if like || comment || follow {
-										// log.Printf("%s has %d followers\n", poster.Username, followerCount)
-
-										if relationshipRatio >= potencyRatio {
-											l++
-											// Like, then comment/follow
-											if like {
-												if userLikesCount, ok := likesToAccountPerSession[posterInfo.Username]; ok {
-													if userLikesCount < maxLikesToAccountPerSession {
-														likeImage(tag, db, item, posterInfo)
-														item.HasLiked = true
-													} else {
-														log.Println("Likes count per user reached [" + poster.Username + "]")
-													}
-												} else {
-													likeImage(tag, db, item, posterInfo)
-												}
-
-												previoslyFollowed, _ := getFollowed(db, posterInfo.Username)
-												if previoslyFollowed != "" {
-													log.Printf("%s already following (%s), skipping\n", posterInfo.Username, previoslyFollowed)
-												} else {
-													if comment {
-														if !item.HasLiked {
-															commentImage(tag, db, item)
-														}
-													}
-													if follow {
-														followUser(tag, db, posterInfo)
-													}
-												}
-
-												// This is to avoid the temporary ban by Instagram
-												time.Sleep(30 * time.Second)
-											}
-										}
-									} else {
-										log.Printf("%s, nothing to do\n", poster.Username)
-									}
-									// log.Printf("%s done\n\n", poster.Username)
+								// item.Next()
+								// for index := range images.FeedsResponse.Items {
+								if !followIsStarted.IsSet() {
+									stopChan <- true
+									return
 								}
-
-								if viper.IsSet("limits.max_retry") && i > viper.GetInt("limits.max_retry") {
-									log.Println("Currently not enough images for this tag to achieve goals")
+								// Exiting the loop if there is nothing left to do
+								if numFollowed >= followCount && numLiked >= likeCount && numCommented >= commentCount {
 									break
 								}
+
+								// Skip our own images
+								if item.User.Username == instaUsername {
+									continue
+								}
+
+								// Check if we should fetch new images for tag
+								if l >= followCount && l >= likeCount && l >= commentCount {
+									break
+								}
+
+								if stringInStringSlice(item.User.Username, whiteList) {
+									log.Printf("Skip following %s, in white list\n", item.User.Username)
+									continue
+								}
+
+								// Getting the user info
+								// Instagram will return a 500 sometimes, so we will retry 10 times.
+								// Check retry() for more info.
+								var posterInfo, ok = usersInfo[item.User.Username]
+								if ok {
+									// log.Println("from cache " + posterInfo.User.Username + " - for #" + tag)
+								} else {
+									err := retry(10, 20*time.Second, func() (err error) {
+										posterNew, err := insta.Profiles.ByName(item.User.Username)
+										if err == nil {
+											usersInfo[item.User.Username] = *posterNew
+											posterInfo = *posterNew
+										}
+										return
+									})
+									check(err)
+								}
+
+								poster := posterInfo
+								followerCount := poster.FollowerCount
+								likesCount := item.Likes
+								commentsCount := item.CommentCount
+								followingCount := poster.FollowingCount
+
+								// Will only follow and comment if we like the picture
+								like := numLiked < likeCount && !item.HasLiked
+								follow := numFollowed < followCount && like
+								comment := numCommented < commentCount && like
+
+								var relationshipRatio float64 // = 0.0
+
+								if followerCount != 0 && followingCount != 0 {
+									relationshipRatio = float64(followingCount) / float64(followerCount)
+								}
+
+								// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
+
+								if follow {
+									if relationshipRatio == 0 || relationshipRatio < potencyRatio {
+										log.Printf("%s is not a potential user with the relationship ratio of %.2f (%d/%d) ~skipping user\n", poster.Username, relationshipRatio, followingCount, followerCount)
+										follow = false
+									} else {
+										log.Printf("%s with the relationship ratio of %.2f (%d/%d)\n", poster.Username, relationshipRatio, followingCount, followerCount)
+									}
+								}
+
+								// if followerCount > followUpperLimit {
+								// 	log.Printf("%s has %d followers, more than max %d\n", poster.Username, followerCount, followUpperLimit)
+								// 	follow = false
+								// } else if followerCount < followLowerLimit {
+								// 	log.Printf("%s has %d followers, less than min %d\n", poster.Username, followerCount, followLowerLimit)
+								// 	follow = false
 								// }
+
+								if likesCount > likeUpperLimit {
+									log.Printf("%s's image has %d likes, more than max %d\n", poster.Username, likesCount, likeUpperLimit)
+									like = false
+								} else if likesCount < likeLowerLimit {
+									log.Printf("%s's image has %d likes, less than min %d\n", poster.Username, likesCount, likeLowerLimit)
+									like = false
+								}
+
+								if commentsCount > commentUpperLimit {
+									log.Printf("%s's image has %d comments, more than max %d\n", poster.Username, commentsCount, commentUpperLimit)
+									comment = false
+								} else if commentsCount < commentLowerLimit {
+									log.Printf("%s's image has %d comments, less than min %d\n", poster.Username, commentsCount, commentLowerLimit)
+									comment = false
+								}
+
+								if like || comment || follow {
+									// log.Printf("%s has %d followers\n", poster.Username, followerCount)
+
+									if relationshipRatio >= potencyRatio {
+										l++
+										// Like, then comment/follow
+										if like {
+											if userLikesCount, ok := likesToAccountPerSession[posterInfo.Username]; ok {
+												if userLikesCount < maxLikesToAccountPerSession {
+													likeImage(tag, db, item, posterInfo)
+													item.HasLiked = true
+												} else {
+													log.Println("Likes count per user reached [" + poster.Username + "]")
+												}
+											} else {
+												likeImage(tag, db, item, posterInfo)
+											}
+
+											previoslyFollowed, _ := getFollowed(db, posterInfo.Username)
+											if previoslyFollowed != "" {
+												log.Printf("%s already following (%s), skipping\n", posterInfo.Username, previoslyFollowed)
+											} else {
+												if comment {
+													if !item.HasLiked {
+														commentImage(tag, db, item)
+													}
+												}
+												if follow {
+													followUser(tag, db, posterInfo)
+												}
+											}
+
+											// This is to avoid the temporary ban by Instagram
+											time.Sleep(30 * time.Second)
+										}
+									}
+								} else {
+									log.Printf("%s, nothing to do\n", poster.Username)
+								}
 							}
+							// log.Printf("%s done\n\n", poster.Username)
+							// }
+
+							// if viper.IsSet("limits.max_retry") && i > viper.GetInt("limits.max_retry") {
+							// 	log.Println("Currently not enough images for this tag to achieve goals")
+							// 	break
+							// }
+							// }
+							// }
+							// }
 
 							reportAsString = fmt.Sprintf("[%d/%d] %d%%", state["follow_current"], state["follow_all_count"], state["follow"])
 							for tag := range report {
