@@ -804,7 +804,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						// browse(tag, db, stopChan)
 						feedTag, err := insta.Feed.Tags(tag)
 						// feedTag.AutoLoadMoreEnabled = true
-						// feedTag.Next()
+
 						if err != nil {
 							log.Println(err)
 						} else {
@@ -978,6 +978,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 								} else {
 									log.Printf("%s, nothing to do\n", poster.Username)
 								}
+								feedTag.Next()
 							}
 							// log.Printf("%s done\n\n", poster.Username)
 							// }
