@@ -984,7 +984,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 									if report[tag]["like"] > 0 || report[tag]["follow"] > 0 || report[tag]["comment"] > 0 {
 										reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
 									} else {
-										reportAsString += fmt.Sprintf("\n#%s: no actions, possibly not enough images", tag)
+										reportAsString += fmt.Sprintf("\n#%s: ...", tag)
 									}
 								}
 
