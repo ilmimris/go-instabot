@@ -1074,7 +1074,12 @@ func commentImage(tag string, db *bolt.DB, image goinsta.Item) {
 	// rand.Seed(time.Now().Unix())
 	text := commentsList[rand.Intn(len(commentsList))]
 	if !*dev {
-		image.Comments.Add(text)
+		image.Comments.Sync()
+		err := image.Comments.Add(text)
+		if err != nil {
+			log.Println(err)
+			return
+		}
 		// insta.Comment(image.ID, text)
 	}
 	log.Println("Commented " + text)
