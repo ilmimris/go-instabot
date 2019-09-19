@@ -940,17 +940,6 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 								}
 
 								if like || comment || follow {
-									reportAsString = fmt.Sprintf("[%d/%d] %d%%", state["follow_current"], state["follow_all_count"], state["follow"])
-									for tag := range report {
-										if report[tag]["like"] > 0 || report[tag]["follow"] > 0 || report[tag]["comment"] > 0 {
-											reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
-										} else {
-											reportAsString += fmt.Sprintf("\n#%s: ...", tag)
-										}
-									}
-
-									telegramResp <- telegramResponse{reportAsString, "follow"}
-
 									// log.Printf("%s has %d followers\n", poster.Username, followerCount)
 
 									if relationshipRatio >= potencyRatio {
@@ -981,9 +970,6 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 													followUser(tag, db, posterInfo)
 												}
 											}
-
-											// This is to avoid the temporary ban by Instagram
-											time.Sleep(17 * time.Second)
 										}
 									}
 								} else {
@@ -1000,6 +986,9 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 								}
 
 								telegramResp <- telegramResponse{reportAsString, "follow"}
+
+								// This is to avoid the temporary ban by Instagram
+								time.Sleep(17 * time.Second)
 
 								feedTag.Next()
 							}
@@ -1097,7 +1086,7 @@ func commentImage(tag string, db *bolt.DB, image goinsta.Item) {
 	// rand.Seed(time.Now().Unix())
 	text := commentsList[rand.Intn(len(commentsList))]
 	if !*dev {
-		image.Comments.Sync()
+		// image.Comments.Sync()
 		err := image.Comments.Add(text)
 		if err != nil {
 			log.Println(err)
