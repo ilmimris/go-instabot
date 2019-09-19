@@ -978,6 +978,18 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 								} else {
 									log.Printf("%s, nothing to do\n", poster.Username)
 								}
+
+								reportAsString = fmt.Sprintf("[%d/%d] %d%%", state["follow_current"], state["follow_all_count"], state["follow"])
+								for tag := range report {
+									if report[tag]["like"] > 0 || report[tag]["follow"] > 0 || report[tag]["comment"] > 0 {
+										reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
+									} else {
+										reportAsString += fmt.Sprintf("\n#%s: no actions, possibly not enough images", tag)
+									}
+								}
+
+								telegramResp <- telegramResponse{reportAsString, "follow"}
+
 								feedTag.Next()
 							}
 							// log.Printf("%s done\n\n", poster.Username)
@@ -991,14 +1003,14 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 							// }
 							// }
 
-							reportAsString = fmt.Sprintf("[%d/%d] %d%%", state["follow_current"], state["follow_all_count"], state["follow"])
-							for tag := range report {
-								if report[tag]["like"] > 0 || report[tag]["follow"] > 0 || report[tag]["comment"] > 0 {
-									reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
-								} else {
-									reportAsString += fmt.Sprintf("\n#%s: no actions, possibly not enough images", tag)
-								}
-							}
+							// reportAsString = fmt.Sprintf("[%d/%d] %d%%", state["follow_current"], state["follow_all_count"], state["follow"])
+							// for tag := range report {
+							// 	if report[tag]["like"] > 0 || report[tag]["follow"] > 0 || report[tag]["comment"] > 0 {
+							// 		reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
+							// 	} else {
+							// 		reportAsString += fmt.Sprintf("\n#%s: no actions, possibly not enough images", tag)
+							// 	}
+							// }
 
 							if current != allCount {
 								reportAsString += fmt.Sprintf("\n... sleep %d seconds", 10)
