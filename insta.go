@@ -940,6 +940,17 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 								}
 
 								if like || comment || follow {
+									reportAsString = fmt.Sprintf("[%d/%d] %d%%", state["follow_current"], state["follow_all_count"], state["follow"])
+									for tag := range report {
+										if report[tag]["like"] > 0 || report[tag]["follow"] > 0 || report[tag]["comment"] > 0 {
+											reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
+										} else {
+											reportAsString += fmt.Sprintf("\n#%s: ...", tag)
+										}
+									}
+
+									telegramResp <- telegramResponse{reportAsString, "follow"}
+
 									// log.Printf("%s has %d followers\n", poster.Username, followerCount)
 
 									if relationshipRatio >= potencyRatio {
@@ -972,7 +983,7 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 											}
 
 											// This is to avoid the temporary ban by Instagram
-											time.Sleep(30 * time.Second)
+											time.Sleep(17 * time.Second)
 										}
 									}
 								} else {
