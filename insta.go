@@ -1083,22 +1083,25 @@ func likeImage(tag string, db *bolt.DB, image goinsta.Item, userInfo goinsta.Use
 
 // Comments an image
 func commentImage(tag string, db *bolt.DB, image goinsta.Item) {
-	// rand.Seed(time.Now().Unix())
-	text := commentsList[rand.Intn(len(commentsList))]
-	if !*dev {
-		// image.Comments.Sync()
-		err := image.Comments.Add(text)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		// insta.Comment(image.ID, text)
-	}
-	log.Println("Commented " + text)
-	numCommented++
+	// FIXME
+	return
 
-	report[tag]["comment"]++
-	incStats(db, "comment")
+	// // rand.Seed(time.Now().Unix())
+	// text := commentsList[rand.Intn(len(commentsList))]
+	// if !*dev {
+	// 	// image.Comments.Sync()
+	// 	err := image.Comments.Add(text)
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 		return
+	// 	}
+	// 	// insta.Comment(image.ID, text)
+	// }
+	// log.Println("Commented " + text)
+	// numCommented++
+
+	// report[tag]["comment"]++
+	// incStats(db, "comment")
 }
 
 // Follows a user, if not following already
