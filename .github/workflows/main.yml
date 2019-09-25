@@ -30,10 +30,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: v1.0
           name: Automatic release
+          code: latest
+          prerelease: true
+          allow_override: true
           body: >
             This is automatic release from the latest commit.  
           gzip: folders
-          allow_override: true
           files: >
             LICENSE
             go-instabot
