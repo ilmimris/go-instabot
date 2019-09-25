@@ -11,7 +11,7 @@ jobs:
           go-version: 1.13
       
       - name: Set up requirements
-        run: go get -u 	github.com/ad/cron github.com/ahmdrz/goinsta github.com/boltdb/bolt github.com/fsnotify/fsnotify github.com/go-telegram-bot-api/telegram-bot-api github.com/pkg/errors github.com/spf13/viper github.com/technoweenie/multipartstreamer github.com/tevino/abool gopkg.in/telegram-bot-api.v4
+        run: go get -u github.com/ad/cron github.com/ahmdrz/goinsta github.com/boltdb/bolt github.com/fsnotify/fsnotify github.com/go-telegram-bot-api/telegram-bot-api github.com/pkg/errors github.com/spf13/viper github.com/technoweenie/multipartstreamer github.com/tevino/abool gopkg.in/telegram-bot-api.v4
 
       - name: Check out source code
         uses: actions/checkout@v1
@@ -20,3 +20,21 @@ jobs:
         env:
           GOPROXY: "https://proxy.golang.org"
         run: go build .
+        
+      - name: List directory
+        run: ls -la
+        
+      - name: Release
+        uses: meeDamian/github-release@1.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: v1.0
+          name: Automatic release
+          body: >
+            This is automatic release from the latest commit.  
+          gzip: folders
+          allow_override: true
+          files: >
+            LICENSE
+            go-instabot
+
