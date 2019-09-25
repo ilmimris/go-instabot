@@ -28,10 +28,11 @@ jobs:
         uses: meeDamian/github-release@1.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: v1.0
+          tag: ${{github.sha}}
+          commitish: ${{github.sha}}
           name: Automatic release
           code: latest
-          prerelease: true
+          prerelease: false
           allow_override: true
           body: >
             This is automatic release from the latest commit.  
