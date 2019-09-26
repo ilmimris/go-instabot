@@ -44,4 +44,4 @@ jobs:
           OLSU_OWNER: ad
           OLSU_REPOSITORY: go-instabot
           OLSU_DELETE_RELEASE: yes
-        run: ./olsu-linux-amd64 "Latest release" "latest" "Automatic release" go-instabot-darwin64 go-instabot-linux64 go-instabot-arm go-instabot.exe
+        run: ./olsu-linux-amd64 "Latest release" "latest" "Automatic release" "go-instabot-darwin64" "go-instabot-linux64" "go-instabot-arm" "go-instabot.exe"
