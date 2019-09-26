@@ -21,15 +21,22 @@ jobs:
         run: go get -u github.com/ad/cron github.com/ahmdrz/goinsta github.com/boltdb/bolt github.com/fsnotify/fsnotify github.com/go-telegram-bot-api/telegram-bot-api github.com/pkg/errors github.com/spf13/viper github.com/technoweenie/multipartstreamer github.com/tevino/abool gopkg.in/telegram-bot-api.v4
 
       - name: Check out source code
-        uses: actions/checkout@v1
-   
-      - name: Build binary
-        env:
-          GOPROXY: "https://proxy.golang.org"
-        run: go build .
+        uses: actions/checkout@master
+
+      - name: Build OS X binary
+        run: GOOS=darwin GOARCH=amd64 go build -o go-instabot-darwin64 -a -ldflags '-s -w' .
+        
+      - name: Build Linux binary
+        run: GOOS=linux GOARCH=amd64 go build -o go-instabot-linux64 -a -ldflags '-s -w' .
+     
+      - name: Build ARM binary
+        run: GOOS=linux GOARCH=arm GOARM=6 go build -o go-instabot-arm -a -ldflags '-s -w' .
+        
+      - name: Build windows binary
+        run: GOOS=windows GOARCH=amd64 go build -o go-instabot.exe -a -ldflags '-s -w' .
         
       - name: Install olsu
-        run: wget https://github.com/Telling/olsu/releases/download/v0.1.0/olsu-linux-amd64.zip && unzip olsu-linux-amd64.zip && chmod +x olsu-linux-amd64 # && pwd && ls -la
+        run: wget https://github.com/Telling/olsu/releases/download/v0.1.0/olsu-linux-amd64.zip && unzip olsu-linux-amd64.zip && chmod +x olsu-linux-amd64 && pwd && ls -la
         
       - name: Create or update release
         env:
@@ -37,4 +44,4 @@ jobs:
           OLSU_OWNER: ad
           OLSU_REPOSITORY: go-instabot
           OLSU_DELETE_RELEASE: yes
-        run: ./olsu-linux-amd64 "Latest release" "latest" "Automatic release" go-instabot
+        run: ./olsu-linux-amd64 "Latest release" "latest" "Automatic release" go-instabot-darwin64 go-instabot-linux64 go-instabot-arm go-instabot.exe
