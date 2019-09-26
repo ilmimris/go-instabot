@@ -1,5 +1,12 @@
-name: Build
-on: [push, pull_request]
+name: Release on commit or tag
+on:
+  push:
+    branches:
+    - master
+    - release/*
+  create:
+    tags:
+      - v*
 jobs:
   build:
     name: Build
@@ -15,29 +22,19 @@ jobs:
 
       - name: Check out source code
         uses: actions/checkout@v1
-
-      - name: Build
+   
+      - name: Build binary
         env:
           GOPROXY: "https://proxy.golang.org"
         run: go build .
         
-      - name: List directory
-        run: ls -la
+      - name: Install olsu
+        run: wget https://github.com/Telling/olsu/releases/download/v0.1.0/olsu-linux-amd64.zip && unzip olsu-linux-amd64.zip && chmod +x olsu-linux-amd64 # && pwd && ls -la
         
-      - name: Release
-        uses: meeDamian/github-release@1.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{github.sha}}
-          commitish: ${{github.sha}}
-          name: Automatic release
-          code: latest
-          prerelease: false
-          allow_override: true
-          body: >
-            This is automatic release from the latest commit.  
-          gzip: folders
-          files: >
-            LICENSE
-            go-instabot
-
+      - name: Create or update release
+        env:
+          OLSU_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OLSU_OWNER: ad
+          OLSU_REPOSITORY: go-instabot
+          OLSU_DELETE_RELEASE: yes
+        run: ./olsu-linux-amd64 "Latest release" "latest" "Automatic release" go-instabot
