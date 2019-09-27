@@ -15,7 +15,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/ahmdrz/goinsta/v2"
+	"github.com/ad/goinsta"
 
 	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )

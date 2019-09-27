@@ -636,6 +636,10 @@ func reloadSession() error {
 		return err
 	}
 
+	if insta.Account.Username == "" {
+		return createAndSaveSession()
+	}
+
 	log.Println("ReLogged in as", insta.Account.Username)
 
 	// session, err := ioutil.ReadFile("session")
@@ -1660,58 +1664,49 @@ func getLastLikers() (result []string) {
 func likeFollowersPosts(db *bolt.DB) {
 	return
 
-	// TODO: fix broken method https://github.com/ahmdrz/goinsta/issues/147
+	// timeline := insta.Timeline.Get()
+	// var timelineItems []goinsta.Item
 
-	// media := insta.Timeline.Get()
+	// l := 0
 
-	// for i := 0; i < 15; i++ {
-	// 	media.Next()
-
-	// 	fmt.Println("Next:", media.NextID)
-	// 	for _, item := range media.Items {
-	// 		fmt.Printf("  - %s has %d likes\n", item.Caption.Text, item.Likes)
+	// for timeline.Next() {
+	// 	if l >= 16 {
+	// 		break
+	// 	}
+	// 	for _, item := range timeline.Items {
+	// 		l++
+	// 		timelineItems = append(timelineItems, item)
 	// 	}
 	// }
 
-	// // // insta.Timeline.Sync()
-	// // timeline := insta.Timeline.Get()
-	// // var timelineItems []goinsta.Item
+	// length := len(timelineItems)
+	// if length > 16 {
+	// 	length = 16
+	// }
 
-	// // for insta.Timeline.Next() {
-	// // 	for _, item := range insta.Timeline.Items {
-	// // 		timelineItems = append(timelineItems, item)
-	// // 	}
-	// // }
+	// log.Println(length, timelineItems)
 
-	// // length := len(timelineItems)
-	// // if length > 16 {
-	// // 	length = 16
-	// // }
+	// var usernames []string
 
-	// // log.Println(length)
+	// if length > 0 {
+	// 	items := timelineItems[0:length]
+	// 	for index := range items {
+	// 		log.Println(items[index].ID, items[index].Caption, items[index].User.Username)
+	// 		if !items[index].HasLiked {
+	// 			time.Sleep(5 * time.Second)
+	// 			err := items[index].Like()
+	// 			if err != nil {
+	// 				// log.Println(err)
+	// 			} else {
+	// 				incStats(db, "like")
 
-	// // var usernames []string
+	// 				usernames = append(usernames, items[index].User.Username)
+	// 			}
+	// 		}
+	// 	}
+	// }
 
-	// // if length > 0 {
-	// // 	items := timelineItems[0:length]
-	// // 	for index := range items {
-	// // 		log.Println(items[index].ID, items[index].Caption, items[index].User.Username)
-	// // 		// 		if !items[index].HasLiked {
-	// // 		// 			time.Sleep(5 * time.Second)
-	// // 		// 			insta.Like(items[index].ID)
-	// // 		// 			incStats(db, "like")
-
-	// // 		// 			usernames = append(usernames, items[index].User.Username)
-	// // 		// 		}
-	// // 		// 	}
-	// // 		// 	length = len(usernames)
-	// // 		// 	if length > 0 {
-	// // 		// 		usernames = sliceUnique(usernames)
-	// // 		// 		log.Println("liked", strings.Join(usernames, ", "))
-	// // 	}
-	// // }
-
-	// // log.Println(usernames)
+	// log.Println(usernames)
 }
 
 // func likeFollowersStories(db *bolt.DB) {
