@@ -398,7 +398,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				// }
 
 				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, receiving followers (%d)", len(following)), "unfollow"}
-				time.Sleep(30 * time.Second)
+				time.Sleep(10 * time.Second)
 
 				followers := make([]goinsta.User, 0)
 				usersFollowers := user.Followers()
@@ -413,7 +413,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				// }
 
 				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, checking delay before unfollowed (%d/%d)", len(following), len(followers)), "unfollow"}
-				time.Sleep(30 * time.Second)
+				time.Sleep(10 * time.Second)
 
 				var daysBeforeUnfollow = viper.GetInt("limits.days_before_unfollow")
 				if daysBeforeUnfollow <= 0 || daysBeforeUnfollow >= 30 {
@@ -451,7 +451,6 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				}
 
 				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, checking last likers (%d)", len(users)), "unfollow"}
-				time.Sleep(30 * time.Second)
 
 				lastLikers := getLastLikers()
 				if len(lastLikers) > 0 {
@@ -493,7 +492,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 				}
 
 				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow (%d)", len(users)), "unfollow"}
-				time.Sleep(30 * time.Second)
+				time.Sleep(10 * time.Second)
 
 				if limit <= 0 || limit >= 1000 {
 					limit = 1000
@@ -544,13 +543,13 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 									break
 								} else {
 									fmt.Printf("can't unfollow %s (error: %s)", users[index].Username, err)
-									time.Sleep(60 * time.Second)
+									time.Sleep(61 * time.Second)
 								}
 							} else {
 								setFollowed(db, users[index].Username)
 								incStats(db, "unfollow")
 
-								time.Sleep(30 * time.Second)
+								time.Sleep(61 * time.Second)
 							}
 						} else {
 							time.Sleep(2 * time.Second)
