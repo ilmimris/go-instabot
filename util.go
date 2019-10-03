@@ -21,7 +21,7 @@ import (
 )
 
 // Whether we are in development mode or not
-var dev *bool
+var dev bool
 var configFile *string
 
 // An image will be liked if the poster has more followers than likeLowerLimit, and less than likeUpperLimit
@@ -73,7 +73,7 @@ func check(err error) {
 
 // Parses the options given to the script
 func parseOptions() {
-	dev = flag.Bool("dev", false, "Use this option to use the script in development mode : nothing will be done for real")
+	flag.BoolVar(&dev, "dev", false, "Use this option to use the script in development mode : nothing will be done for real")
 	configFile = flag.String("config", "config/config.json", "Path to config file")
 	logs := flag.Bool("logs", false, "Use this option to enable the logfile")
 

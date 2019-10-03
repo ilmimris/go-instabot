@@ -145,7 +145,7 @@ func followFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 									text := fmt.Sprintf("[%d/%d] refollowing %s (%d%%)", state["refollow_current"], state["refollow_all_count"], users[index].Username, state["refollow"])
 									telegramResp <- telegramResponse{text, "refollow"}
 
-									if !*dev {
+									if !dev {
 										users[index].Follow()
 										// insta.Follow(users[index].ID)
 										setFollowed(db, users[index].Username)
@@ -283,7 +283,7 @@ func followLikers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 													text := fmt.Sprintf("[%d/%d] following %s (%d%%)", state["followLikers_current"], state["followLikers_all_count"], users[index].Username, state["followLikers"])
 													telegramResp <- telegramResponse{text, "followLikers"}
 
-													if !*dev {
+													if !dev {
 														users[index].Follow()
 														// insta.Follow(users[index].ID)
 														setFollowed(db, users[index].Username)
@@ -530,7 +530,7 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 						l.Unlock()
 
 						telegramResp <- telegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], users[index].Username, state["unfollow"]), "unfollow"}
-						if !*dev {
+						if !dev {
 							err := users[index].Unfollow() //insta.UnFollow(users[index].ID)
 							if err != nil {
 								// fmt.Println(err.Error())
@@ -1069,7 +1069,7 @@ func likeImage(tag string, db *bolt.DB, image goinsta.Item, userInfo goinsta.Use
 	log.Println("Liking the picture https://www.instagram.com/p/" + image.Code)
 
 	if !image.HasLiked {
-		if !*dev {
+		if !dev {
 			image.Like()
 			// insta.Like(image.ID)
 		}
@@ -1091,7 +1091,7 @@ func commentImage(tag string, db *bolt.DB, image goinsta.Item) {
 
 	// // rand.Seed(time.Now().Unix())
 	// text := commentsList[rand.Intn(len(commentsList))]
-	// if !*dev {
+	// if !dev {
 	// 	// image.Comments.Sync()
 	// 	err := image.Comments.Add(text)
 	// 	if err != nil {
@@ -1114,7 +1114,7 @@ func followUser(tag string, db *bolt.DB, user goinsta.User) {
 	// check(err)
 	// If not following already
 	if !user.Friendship.Following {
-		if !*dev {
+		if !dev {
 			if user.IsPrivate {
 				log.Printf("%s is private, skipping follow\n", user.Username)
 			} else {
