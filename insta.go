@@ -883,12 +883,16 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 
 								// log.Println("Checking followers for " + poster.Username + " - for #" + tag)
 
-								if follow {
-									if relationshipRatio == 0 || relationshipRatio < potencyRatio {
-										log.Printf("%s is not a potential user with the relationship ratio of %.2f (%d/%d) ~skipping user\n", poster.Username, relationshipRatio, followingCount, followerCount)
-										follow = false
-									} else {
-										log.Printf("%s with the relationship ratio of %.2f (%d/%d)\n", poster.Username, relationshipRatio, followingCount, followerCount)
+								if followCount <= 0 {
+									follow = false
+								} else {
+									if follow {
+										if relationshipRatio == 0 || relationshipRatio < potencyRatio {
+											log.Printf("%s is not a potential user with the relationship ratio of %.2f (%d/%d) ~skipping user\n", poster.Username, relationshipRatio, followingCount, followerCount)
+											follow = false
+										} else {
+											log.Printf("%s with the relationship ratio of %.2f (%d/%d)\n", poster.Username, relationshipRatio, followingCount, followerCount)
+										}
 									}
 								}
 
@@ -900,20 +904,28 @@ func loopTags(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 								// 	follow = false
 								// }
 
-								if likesCount > likeUpperLimit {
-									log.Printf("%s's image has %d likes, more than max %d\n", poster.Username, likesCount, likeUpperLimit)
+								if likeCount <= 0 {
 									like = false
-								} else if likesCount < likeLowerLimit {
-									log.Printf("%s's image has %d likes, less than min %d\n", poster.Username, likesCount, likeLowerLimit)
-									like = false
+								} else {
+									if likesCount > likeUpperLimit {
+										log.Printf("%s's image has %d likes, more than max %d\n", poster.Username, likesCount, likeUpperLimit)
+										like = false
+									} else if likesCount < likeLowerLimit {
+										log.Printf("%s's image has %d likes, less than min %d\n", poster.Username, likesCount, likeLowerLimit)
+										like = false
+									}
 								}
 
-								if commentsCount > commentUpperLimit {
-									log.Printf("%s's image has %d comments, more than max %d\n", poster.Username, commentsCount, commentUpperLimit)
+								if commentCount <= 0 {
 									comment = false
-								} else if commentsCount < commentLowerLimit {
-									log.Printf("%s's image has %d comments, less than min %d\n", poster.Username, commentsCount, commentLowerLimit)
-									comment = false
+								} else {
+									if commentsCount > commentUpperLimit {
+										log.Printf("%s's image has %d comments, more than max %d\n", poster.Username, commentsCount, commentUpperLimit)
+										comment = false
+									} else if commentsCount < commentLowerLimit {
+										log.Printf("%s's image has %d comments, less than min %d\n", poster.Username, commentsCount, commentLowerLimit)
+										comment = false
+									}
 								}
 
 								if like || comment || follow {
