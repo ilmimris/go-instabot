@@ -80,7 +80,7 @@ func main() {
 	c.Start()
 	defer c.Stop()
 
-	go login()
+	go login(false)
 
 	defer insta.Logout()
 
@@ -176,7 +176,7 @@ func main() {
 
 				switch command {
 				case "relogin":
-					err = createAndSaveSession()
+					err = login(true)
 					if err != nil {
 						msg.Text = fmt.Sprintf("relogin failed with error %s", err)
 					} else {

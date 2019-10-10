@@ -2,21 +2,22 @@ package main
 
 import (
 	// "errors"
+	"encoding/json"
 	"fmt"
-	// "io/ioutil"
+	"io/ioutil"
 	"log"
 	"math"
 	"math/rand"
 	"net/http"
 	"net/url"
-	// "os"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ad/cron"
 
-	"github.com/ad/goinsta"
+	"github.com/ryumaev/goinsta/v3"
 
 	"github.com/boltdb/bolt"
 	"github.com/spf13/viper"
@@ -584,90 +585,63 @@ func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 	}
 }
 
-// Logins and saves the session
-func createAndSaveSession() error {
-	insta = goinsta.New(instaUsername, instaPassword)
-	if instaProxy != "" {
-		insta.SetProxy(instaProxy, false)
+// login will try to reload a previous session, and will create a new one if it can't
+func login(relogin bool) error {
+	var err error
+	var session *goinsta.Session
+
+	proxy, err := url.Parse(instaProxy)
+	if instaProxy == "" {
+		proxy = nil
 	}
 
-	err := insta.Login()
+	f, err := ioutil.ReadFile("goinsta-session.json")
 
-	if err == nil {
-		log.Println("Logged in as", insta.Account.Username)
-		err := insta.Export(".goinsta")
-		if err != nil {
-			log.Println("EXPORT Login", err)
-			// return err
+	if relogin || err != nil {
+		insta, err = goinsta.New(instaUsername, instaPassword, "oneplus_7", proxy, nil)
+		if err == nil {
+			err = insta.Login()
+			if err != nil {
+				println(fmt.Sprintf("%v", err))
+				return err
+			} else {
+				log.Println("Logged in as", insta.Account.Username)
+
+				err, session := insta.Export()
+				if err == nil {
+					bytes, err := json.Marshal(session)
+					if err == nil {
+						f, err := os.Create("goinsta-session.json")
+						defer f.Close()
+						if err == nil {
+							f.Write(bytes)
+						} else {
+							println(fmt.Sprintf("%v", err))
+						}
+					} else {
+						println(fmt.Sprintf("%v", err))
+					}
+				} else {
+					println(fmt.Sprintf("%v", err))
+				}
+			}
 		}
-		return nil
-
-		// // key := createKey()
-		// bytes, err := store.Export(insta, key)
-		// if err == nil {
-		// 	err = ioutil.WriteFile("session", bytes, 0644)
-		// 	if err == nil {
-		// 		log.Println("Created and saved the session")
-		// 		return nil
-		// 	}
-		// }
+	} else {
+		_ = json.Unmarshal(f, &session)
+		insta, err = goinsta.New(instaUsername, instaPassword, "oneplus_7", proxy, session)
+		if err == nil {
+			err = insta.Login()
+			if err != nil {
+				println(fmt.Sprintf("%v", err))
+				return err
+			} else {
+				log.Println("reLogged in as", insta.Account.Username)
+			}
+		}
 	}
 
 	return err
 }
-
-// login will try to reload a previous session, and will create a new one if it can't
-func login() {
-	err := reloadSession()
-	if err != nil {
-		err = createAndSaveSession()
-	}
-}
-
-// reloadSession will attempt to recover a previous session
-func reloadSession() error {
-	// if _, err := os.Stat("session"); os.IsNotExist(err) {
-	// 	return errors.New("No session found")
-	// }
-	var err error
-	insta, err = goinsta.Import(".goinsta")
-	if err != nil {
-		log.Println("ReLogin", err)
-		return err
-	}
-
-	if insta.Account.Username == "" {
-		return createAndSaveSession()
-	}
-
-	log.Println("ReLogged in as", insta.Account.Username)
-
-	// session, err := ioutil.ReadFile("session")
-	// check(err)
-	// log.Println("A session file exists")
-
-	// key, err := ioutil.ReadFile("key")
-	// check(err)
-
-	// insta, err = store.Import(session, key)
-	// if err != nil {
-	// 	return errors.New("Couldn't recover the session")
-	// }
-
-	// log.Println("Successfully logged in")
-	return nil
-}
-
-// // createKey creates a key and saves it to file
-// func createKey() []byte {
-// 	key := make([]byte, 32)
-// 	_, err := rand.Read(key)
-// 	check(err)
-// 	err = ioutil.WriteFile("key", key, 0644)
-// 	check(err)
-// 	log.Println("Created and saved the key")
-// 	return key
-// }
 
 func followManager(db *bolt.DB) (startChan chan bool, outerChan, innerChan chan string, stopChan chan bool) {
 	startChan = make(chan bool)
