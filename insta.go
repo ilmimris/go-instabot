@@ -373,7 +373,6 @@ func startUnFollowFromQueue(db *bolt.DB, limit int) {
 				log.Println(err)
 			} else {
 				incStats(db, "unfollow")
-				time.Sleep(60 * time.Second)
 			}
 		} else {
 			log.Printf("[%d/%d] Not following %s\n", current, limit, usersQueue[index])
@@ -385,6 +384,8 @@ func startUnFollowFromQueue(db *bolt.DB, limit int) {
 		if (maxLimit - today) <= 0 {
 			return
 		}
+
+		time.Sleep(time.Duration(3600/(limit+1)) * time.Second)
 	}
 }
 

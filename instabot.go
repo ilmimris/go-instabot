@@ -201,8 +201,10 @@ func main() {
 					}
 				case "follow":
 					startFollow(bot, startFollowChan, int64(update.Message.From.ID))
-				// case "unfollow":
-				// 	startUnfollow(bot, startUnfollowChan, int64(update.Message.From.ID))
+				case "checkunfollow":
+					updateUnfollowList(db)
+					msg.Text = fmt.Sprintf("updateUnfollowList done")
+					bot.Send(msg)
 				case "progress":
 					// var unfollowProgress = "not started"
 					// if state["unfollow"] >= 0 {
