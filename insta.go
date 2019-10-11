@@ -366,6 +366,8 @@ func startUnFollowFromQueue(db *bolt.DB, limit int) {
 			continue
 		}
 
+		user.FriendShip()
+
 		if user.Friendship.Following {
 			log.Printf("[%d/%d] Unfollowing %s\n", current, limit, usersQueue[index])
 			err := user.Unfollow()
@@ -1222,53 +1224,53 @@ func startFollow(bot *tgbotapi.BotAPI, startChan chan bool, userID int64) {
 	}
 }
 
-func startUnfollow(bot *tgbotapi.BotAPI, startChan chan bool, userID int64) {
-	msg := tgbotapi.NewMessage(userID, "")
-	if unfollowIsStarted.IsSet() {
-		msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
+// func startUnfollow(bot *tgbotapi.BotAPI, startChan chan bool, userID int64) {
+// 	msg := tgbotapi.NewMessage(userID, "")
+// 	if unfollowIsStarted.IsSet() {
+// 		msg.Text = fmt.Sprintf("Unfollow in progress (%d%%)", state["unfollow"])
 
-		l.RLock()
-		rn := editMessage["unfollow"]
-		ln := len(rn)
-		l.RUnlock()
+// 		l.RLock()
+// 		rn := editMessage["unfollow"]
+// 		ln := len(rn)
+// 		l.RUnlock()
 
-		if ln > 0 && intInStringSlice(int(userID), getKeys(rn)) {
-			for UserID, EditID := range rn {
-				edit := tgbotapi.EditMessageTextConfig{
-					BaseEdit: tgbotapi.BaseEdit{
-						ChatID:    int64(UserID),
-						MessageID: EditID,
-					},
-					Text: msg.Text,
-				}
-				bot.Send(edit)
-			}
-		} else {
-			msgRes, err := bot.Send(msg)
-			if err == nil {
-				// log.Print(msgRes, msgRes.MessageID)
-				l.Lock()
-				editMessage["unfollow"][int(userID)] = msgRes.MessageID
-				l.Unlock()
-			}
-		}
-	} else {
-		l.Lock()
-		editMessage["unfollow"] = make(map[int]int)
-		l.Unlock()
+// 		if ln > 0 && intInStringSlice(int(userID), getKeys(rn)) {
+// 			for UserID, EditID := range rn {
+// 				edit := tgbotapi.EditMessageTextConfig{
+// 					BaseEdit: tgbotapi.BaseEdit{
+// 						ChatID:    int64(UserID),
+// 						MessageID: EditID,
+// 					},
+// 					Text: msg.Text,
+// 				}
+// 				bot.Send(edit)
+// 			}
+// 		} else {
+// 			msgRes, err := bot.Send(msg)
+// 			if err == nil {
+// 				// log.Print(msgRes, msgRes.MessageID)
+// 				l.Lock()
+// 				editMessage["unfollow"][int(userID)] = msgRes.MessageID
+// 				l.Unlock()
+// 			}
+// 		}
+// 	} else {
+// 		l.Lock()
+// 		editMessage["unfollow"] = make(map[int]int)
+// 		l.Unlock()
 
-		startChan <- true
+// 		startChan <- true
 
-		msg.Text = "Starting unfollow"
-		fmt.Println(msg.Text)
-		msgRes, err := bot.Send(msg)
-		if err == nil {
-			l.Lock()
-			editMessage["unfollow"][int(userID)] = msgRes.MessageID
-			l.Unlock()
-		}
-	}
-}
+// 		msg.Text = "Starting unfollow"
+// 		fmt.Println(msg.Text)
+// 		msgRes, err := bot.Send(msg)
+// 		if err == nil {
+// 			l.Lock()
+// 			editMessage["unfollow"][int(userID)] = msgRes.MessageID
+// 			l.Unlock()
+// 		}
+// 	}
+// }
 
 func startRefollow(bot *tgbotapi.BotAPI, startChan chan bool, innerRefollowChan chan string, userID int64, target string) {
 	msg := tgbotapi.NewMessage(userID, "")
