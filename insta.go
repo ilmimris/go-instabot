@@ -352,6 +352,7 @@ func startUnFollowFromQueue(db *bolt.DB, limit int) {
 
 	today, _ := getStats(db, "unfollow")
 	if maxLimit == 0 || (maxLimit-today) <= 0 {
+		log.Println("today unfollow limit reached")
 		return
 	}
 
@@ -366,18 +367,12 @@ func startUnFollowFromQueue(db *bolt.DB, limit int) {
 			continue
 		}
 
-		user.FriendShip()
-
-		if user.Friendship.Following {
-			log.Printf("[%d/%d] Unfollowing %s\n", current, limit, usersQueue[index])
-			err := user.Unfollow()
-			if err != nil {
-				log.Println(err)
-			} else {
-				incStats(db, "unfollow")
-			}
+		log.Printf("[%d/%d] Unfollowing %s\n", current, limit, usersQueue[index])
+		err = user.Unfollow()
+		if err != nil {
+			log.Println(err)
 		} else {
-			log.Printf("[%d/%d] Not following %s\n", current, limit, usersQueue[index])
+			incStats(db, "unfollow")
 		}
 
 		deleteByKey(db, "unfollowqueue", usersQueue[index])
@@ -389,6 +384,7 @@ func startUnFollowFromQueue(db *bolt.DB, limit int) {
 
 		time.Sleep(time.Duration(3600/(limit+1)) * time.Second)
 	}
+	log.Println("unfollow finished")
 }
 
 func updateUnfollowList(db *bolt.DB) {

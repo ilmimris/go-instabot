@@ -77,13 +77,13 @@ func main() {
 	}
 	defer db.Close()
 
+	login(false)
+
+	defer insta.Logout()
+
 	c := cron.New()
 	c.Start()
 	defer c.Stop()
-
-	go login(false)
-
-	defer insta.Logout()
 
 	telegramResp = make(chan telegramResponse)
 
