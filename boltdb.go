@@ -129,3 +129,85 @@ func setFollowed(db *bolt.DB, id string) error {
 	})
 	return nil
 }
+
+func getListFromQueue(db *bolt.DB, queuename string, limit int) []string {
+	var usersQueue []string
+	var current = 0
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(queuename))
+		if b == nil {
+			return errors.Wrapf(fmt.Errorf("failed to find bucket"), "failed to get '"+queuename+"' bucket")
+		}
+
+		c := b.Cursor()
+
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			if current < limit {
+				usersQueue = append(usersQueue, string(k))
+				//fmt.Printf("key=>[%s], value=[%s]\n", k, v)
+				current++
+			} else {
+				break
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("failure : %s\n", err)
+	}
+	return usersQueue
+}
+
+func getItemFromQueue(db *bolt.DB, queuename string, key string) (value string) {
+	db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(queuename))
+		if b == nil {
+			return errors.Wrapf(fmt.Errorf("failed to find bucket"), "failed to get '"+queuename+"' bucket")
+		}
+
+		if v := b.Get([]byte(key)); v != nil {
+			value = string(v)
+			return nil
+		}
+		return nil
+	})
+	return value
+}
+
+func addToQueue(db *bolt.DB, queuename string, username string) {
+	date := time.Now().Format("20060102")
+	updateDB(db, []byte(queuename), []byte(username), []byte(date))
+}
+
+func deleteByKey(db *bolt.DB, bucketName, key string) error {
+	if err := db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte(bucketName)).Delete([]byte(key))
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// updateDB : store data
+func updateDB(db *bolt.DB, bucketName, key, value []byte) error {
+	err := db.Update(func(tx *bolt.Tx) error {
+		bkt, err := tx.CreateBucketIfNotExists(bucketName)
+		if err != nil {
+			return err
+		}
+		err = bkt.Put(key, value)
+		if err != nil {
+			return err
+		}
+		if err := db.Sync(); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

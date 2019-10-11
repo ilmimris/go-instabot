@@ -321,268 +321,314 @@ func followLikers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
 	}
 }
 
-func unfollowManager(db *bolt.DB) (startChan chan bool, outerChan, innerChan chan string, stopChan chan bool) {
-	startChan = make(chan bool)
-	outerChan = make(chan string)
-	innerChan = make(chan string)
-	stopChan = make(chan bool)
-	go func() {
-		for {
-			select {
-			case <-startChan:
-				if !unfollowIsStarted.IsSet() {
-					unfollowIsStarted.Set()
-					go syncFollowers(db, innerChan, stopChan)
-					innerChan <- "start"
-				} else {
-					fmt.Println("can't start task, task already running!")
-				}
-			case msg := <-outerChan:
-				fmt.Println("unfollow <- ", msg)
-				//default:
-				//	time.Sleep(100 * time.Millisecond)
-			}
+// func unfollowManager(db *bolt.DB) (startChan chan bool, outerChan, innerChan chan string, stopChan chan bool) {
+// 	startChan = make(chan bool)
+// 	outerChan = make(chan string)
+// 	innerChan = make(chan string)
+// 	stopChan = make(chan bool)
+// 	go func() {
+// 		for {
+// 			select {
+// 			case <-startChan:
+// 				if !unfollowIsStarted.IsSet() {
+// 					unfollowIsStarted.Set()
+// 					go syncFollowers(db, innerChan, stopChan)
+// 					innerChan <- "start"
+// 				} else {
+// 					fmt.Println("can't start task, task already running!")
+// 				}
+// 			case msg := <-outerChan:
+// 				fmt.Println("unfollow <- ", msg)
+// 				//default:
+// 				//	time.Sleep(100 * time.Millisecond)
+// 			}
+// 		}
+// 	}()
+// 	return startChan, outerChan, innerChan, stopChan
+// }
+
+func startUnFollowFromQueue(db *bolt.DB, limit int) {
+	var maxLimit = viper.GetInt("limits.max_unfollow_per_day")
+
+	today, _ := getStats(db, "unfollow")
+	if maxLimit == 0 || (maxLimit-today) <= 0 {
+		return
+	}
+
+	var current = 0
+	usersQueue := getListFromQueue(db, "unfollowqueue", limit)
+	for index := range usersQueue {
+		current++
+		user, err := insta.Profiles.ByName(usersQueue[index])
+		if err != nil {
+			log.Printf("[%d/%d] %s doesn't exist\n", current, limit, usersQueue[index])
+			deleteByKey(db, "unfollowqueue", usersQueue[index])
+			continue
 		}
-	}()
-	return startChan, outerChan, innerChan, stopChan
-}
 
-func syncFollowers(db *bolt.DB, innerChan chan string, stopChan chan bool) {
-	defer unfollowIsStarted.UnSet()
-
-	resultError := ""
-
-	for {
-		select {
-		case msg := <-innerChan:
-			fmt.Println("unfollow <- ", msg)
-			go func() {
-
-				l.Lock()
-				state["unfollow"] = 0
-				l.Unlock()
-
-				time.Sleep(1 * time.Second)
-
-				var limit = viper.GetInt("limits.max_unfollow_per_day")
-				today, _ := getStats(db, "unfollow")
-
-				if limit == 0 || (limit-today) <= 0 {
-					stopChan <- true
-					return
-				}
-
-				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, receiving following users"), "unfollow"}
-
-				user, err := insta.Profiles.ByName(insta.Account.Username)
-				if err != nil {
-					log.Println(err)
-				}
-
-				following := make([]goinsta.User, 0)
-				usersFollowing := user.Following()
-				for usersFollowing.Next() {
-					for _, user := range usersFollowing.Users {
-						following = append(following, user)
-					}
-				}
-
-				// following := user.Following() // . TotalUserFollowers(user.ID)
-				// if err != nil {
-				// 	fmt.Println(err)
-				// 	return
-				// }
-
-				// following, err := insta.SelfTotalUserFollowing()
-				// if err != nil {
-				// 	fmt.Println(err)
-				// }
-
-				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, receiving followers (%d)", len(following)), "unfollow"}
-				time.Sleep(10 * time.Second)
-
-				followers := make([]goinsta.User, 0)
-				usersFollowers := user.Followers()
-				for usersFollowers.Next() {
-					for _, user := range usersFollowers.Users {
-						followers = append(followers, user)
-					}
-				}
-				// followers := user.Followers() //insta.SelfTotalUserFollowers()
-				// if err != nil {
-				// 	fmt.Println(err)
-				// }
-
-				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, checking delay before unfollowed (%d/%d)", len(following), len(followers)), "unfollow"}
-				time.Sleep(10 * time.Second)
-
-				var daysBeforeUnfollow = viper.GetInt("limits.days_before_unfollow")
-				if daysBeforeUnfollow <= 0 || daysBeforeUnfollow >= 30 {
-					daysBeforeUnfollow = 3
-				}
-
-				// type User struct {
-				// 	ID         int64  `json:"pk"`
-				// 	Username   string `json:"username"`
-				// 	ProfilePic string `json:"profile_pic"`
-				// }
-
-				var users []goinsta.User
-				for index := range following {
-					if !contains(followers, following[index]) {
-						previoslyFollowed, _ := getFollowed(db, following[index].Username)
-						if previoslyFollowed != "" {
-							t, err := time.Parse("20060102", previoslyFollowed)
-
-							if err != nil {
-								fmt.Println(err)
-							} else {
-								duration := time.Since(t)
-								if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
-									fmt.Printf("%s not followed us less then %f hours, skipping!\n", following[index].Username, duration.Hours())
-									continue
-								} else {
-									users = append(users, following[index])
-								}
-							}
-						} else {
-							users = append(users, following[index])
-						}
-					}
-				}
-
-				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, checking last likers (%d)", len(users)), "unfollow"}
-
-				lastLikers := getLastLikers()
-				if len(lastLikers) > 0 {
-					if len(following) > 0 {
-						telegramResp <- telegramResponse{fmt.Sprintf("Found %d following, %d likers for last 10 posts\n", len(following), len(lastLikers)), "unfollow"}
-						var notLikers []goinsta.User
-						for index := range following {
-							if !stringInStringSlice(following[index].Username, lastLikers) {
-								notLikers = append(notLikers, following[index])
-							}
-						}
-
-						if len(notLikers) > 0 {
-							for index := range notLikers {
-								previoslyFollowed, _ := getFollowed(db, notLikers[index].Username)
-								if previoslyFollowed != "" {
-									t, err := time.Parse("20060102", previoslyFollowed)
-
-									if err != nil {
-										fmt.Println(err)
-									} else {
-										duration := time.Since(t)
-										if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
-
-										} else {
-											if !contains(users, notLikers[index]) {
-												users = append(users, notLikers[index])
-											}
-										}
-									}
-								} else {
-									if !contains(users, notLikers[index]) {
-										users = append(users, notLikers[index])
-									}
-								}
-							}
-						}
-					}
-				}
-
-				telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow (%d)", len(users)), "unfollow"}
-				time.Sleep(10 * time.Second)
-
-				if limit <= 0 || limit >= 1000 {
-					limit = 1000
-				}
-
-				if today > 0 {
-					limit = limit - today
-				}
-
-				var current = 0
-				var allCount = int(math.Min(float64(len(users)), float64(limit)))
-				if allCount > 0 {
-					telegramResp <- telegramResponse{fmt.Sprintf("%d will be unfollowed", allCount), "unfollow"}
-
-					for index := range users {
-						if !unfollowIsStarted.IsSet() {
-							stopChan <- true
-							return
-						}
-
-						if current >= limit {
-							continue
-						}
-
-						if stringInStringSlice(users[index].Username, whiteList) {
-							telegramResp <- telegramResponse{fmt.Sprintf("[%d/%d] Skip Unfollowing %s (%d%%), in white list\n", state["unfollow_current"], state["unfollow_all_count"], users[index].Username, state["unfollow"]), "unfollow"}
-							continue
-						}
-
-						current++
-						l.Lock()
-						state["unfollow"] = int(current * 100 / allCount)
-						state["unfollow_current"] = current
-						state["unfollow_all_count"] = allCount
-						l.Unlock()
-
-						telegramResp <- telegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], users[index].Username, state["unfollow"]), "unfollow"}
-						if !dev {
-							err := users[index].Unfollow() //insta.UnFollow(users[index].ID)
-							if err != nil {
-								// fmt.Println(err.Error())
-								if err.Error() == "fail: feedback_required ()" {
-									resultError = "/unfollow stopped: feedback_required"
-									l.Lock()
-									state["unfollow_current"]--
-									l.Unlock()
-									// telegramResp <- telegramResponse{fmt.Sprintf(), "unfollow"}
-									break
-								} else {
-									fmt.Printf("can't unfollow %s (error: %s)", users[index].Username, err)
-									time.Sleep(61 * time.Second)
-								}
-							} else {
-								setFollowed(db, users[index].Username)
-								incStats(db, "unfollow")
-
-								time.Sleep(61 * time.Second)
-							}
-						} else {
-							time.Sleep(2 * time.Second)
-						}
-					}
-				}
-
-				stopChan <- true
-			}()
-		case <-stopChan:
-
-			if resultError != "" {
-				telegramResp <- telegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n%s", state["unfollow_current"], resultError), "unfollow"}
+		if user.Friendship.Following {
+			log.Printf("[%d/%d] Unfollowing %s\n", current, limit, usersQueue[index])
+			err := user.Unfollow()
+			if err != nil {
+				log.Println(err)
 			} else {
-				if state["unfollow_current"] == 0 {
-					telegramResp <- telegramResponse{fmt.Sprintf("No one was unfollowed"), "unfollow"}
-				} else {
-					telegramResp <- telegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!", state["unfollow_current"]), "unfollow"}
-				}
+				incStats(db, "unfollow")
+				time.Sleep(60 * time.Second)
 			}
+		} else {
+			log.Printf("[%d/%d] Not following %s\n", current, limit, usersQueue[index])
+		}
 
-			l.Lock()
-			state["unfollow_current"] = 0
-			state["unfollow_all_count"] = 0
-			state["unfollow"] = -1
-			l.Unlock()
+		deleteByKey(db, "unfollowqueue", usersQueue[index])
 
+		today, _ := getStats(db, "unfollow")
+		if (maxLimit - today) <= 0 {
 			return
-			//default:
-			//	time.Sleep(100 * time.Millisecond)
 		}
 	}
+}
+
+func updateUnfollowList(db *bolt.DB) {
+	// defer unfollowIsStarted.UnSet()
+
+	// // resultError := ""
+
+	// for {
+	// 	select {
+	// 	case msg := <-innerChan:
+	// 		fmt.Println("unfollow <- ", msg)
+	// 		go func() {
+	// l.Lock()
+	// state["unfollow"] = 0
+	// l.Unlock()
+
+	// time.Sleep(1 * time.Second)
+
+	// var limit = viper.GetInt("limits.max_unfollow_per_day")
+	// today, _ := getStats(db, "unfollow")
+
+	// if limit == 0 || (limit-today) <= 0 {
+	// 	stopChan <- true
+	// 	return
+	// }
+
+	// telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, receiving following users"), "unfollow"}
+
+	user, err := insta.Profiles.ByName(insta.Account.Username)
+	if err != nil {
+		log.Println(err)
+	}
+
+	following := make([]goinsta.User, 0)
+	usersFollowing := user.Following()
+	for usersFollowing.Next() {
+		for _, user := range usersFollowing.Users {
+			following = append(following, user)
+		}
+	}
+
+	// following := user.Following() // . TotalUserFollowers(user.ID)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+
+	// following, err := insta.SelfTotalUserFollowing()
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+
+	// telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, receiving followers (%d)", len(following)), "unfollow"}
+	time.Sleep(600 * time.Second)
+
+	followers := make([]goinsta.User, 0)
+	usersFollowers := user.Followers()
+	for usersFollowers.Next() {
+		for _, user := range usersFollowers.Users {
+			followers = append(followers, user)
+		}
+	}
+	// followers := user.Followers() //insta.SelfTotalUserFollowers()
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+
+	// telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, checking delay before unfollowed (%d/%d)", len(following), len(followers)), "unfollow"}
+	time.Sleep(600 * time.Second)
+
+	var daysBeforeUnfollow = viper.GetInt("limits.days_before_unfollow")
+	if daysBeforeUnfollow <= 0 || daysBeforeUnfollow >= 30 {
+		daysBeforeUnfollow = 3
+	}
+
+	// type User struct {
+	// 	ID         int64  `json:"pk"`
+	// 	Username   string `json:"username"`
+	// 	ProfilePic string `json:"profile_pic"`
+	// }
+
+	var users []goinsta.User
+	for index := range following {
+		if !contains(followers, following[index]) {
+			previoslyFollowed, _ := getFollowed(db, following[index].Username)
+			if previoslyFollowed != "" {
+				t, err := time.Parse("20060102", previoslyFollowed)
+
+				if err != nil {
+					fmt.Println(err)
+				} else {
+					duration := time.Since(t)
+					if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
+						fmt.Printf("%s not followed us less then %f hours, skipping!\n", following[index].Username, duration.Hours())
+						continue
+					} else {
+						users = append(users, following[index])
+					}
+				}
+			} else {
+				users = append(users, following[index])
+			}
+		}
+	}
+
+	time.Sleep(600 * time.Second)
+
+	// telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow, checking last likers (%d)", len(users)), "unfollow"}
+
+	lastLikers := getLastLikers()
+	if len(lastLikers) > 0 {
+		if len(following) > 0 {
+			// telegramResp <- telegramResponse{fmt.Sprintf("Found %d following, %d likers for last 10 posts\n", len(following), len(lastLikers)), "unfollow"}
+			var notLikers []goinsta.User
+			for index := range following {
+				if !stringInStringSlice(following[index].Username, lastLikers) {
+					notLikers = append(notLikers, following[index])
+				}
+			}
+
+			if len(notLikers) > 0 {
+				for index := range notLikers {
+					previoslyFollowed, _ := getFollowed(db, notLikers[index].Username)
+					if previoslyFollowed != "" {
+						t, err := time.Parse("20060102", previoslyFollowed)
+
+						if err != nil {
+							fmt.Println(err)
+						} else {
+							duration := time.Since(t)
+							if int(duration.Hours()) < (24 * daysBeforeUnfollow) {
+
+							} else {
+								if !contains(users, notLikers[index]) {
+									users = append(users, notLikers[index])
+								}
+							}
+						}
+					} else {
+						if !contains(users, notLikers[index]) {
+							users = append(users, notLikers[index])
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for index := range users {
+		addToQueue(db, "unfollowqueue", users[index].Username)
+	}
+
+	// telegramResp <- telegramResponse{fmt.Sprintf("Preparing to unfollow (%d)", len(users)), "unfollow"}
+	// time.Sleep(10 * time.Second)
+
+	// if limit <= 0 || limit >= 1000 {
+	// 	limit = 1000
+	// }
+
+	// if today > 0 {
+	// 	limit = limit - today
+	// }
+
+	// var current = 0
+	// var allCount = int(math.Min(float64(len(users)), float64(limit)))
+	// if allCount > 0 {
+	// 	telegramResp <- telegramResponse{fmt.Sprintf("%d will be unfollowed", allCount), "unfollow"}
+
+	// 	for index := range users {
+	// 		if !unfollowIsStarted.IsSet() {
+	// 			stopChan <- true
+	// 			return
+	// 		}
+
+	// 		if current >= limit {
+	// 			continue
+	// 		}
+
+	// 		if stringInStringSlice(users[index].Username, whiteList) {
+	// 			telegramResp <- telegramResponse{fmt.Sprintf("[%d/%d] Skip Unfollowing %s (%d%%), in white list\n", state["unfollow_current"], state["unfollow_all_count"], users[index].Username, state["unfollow"]), "unfollow"}
+	// 			continue
+	// 		}
+
+	// 		current++
+	// 		l.Lock()
+	// 		state["unfollow"] = int(current * 100 / allCount)
+	// 		state["unfollow_current"] = current
+	// 		state["unfollow_all_count"] = allCount
+	// 		l.Unlock()
+
+	// 		telegramResp <- telegramResponse{fmt.Sprintf("[%d/%d] Unfollowing %s (%d%%)\n", state["unfollow_current"], state["unfollow_all_count"], users[index].Username, state["unfollow"]), "unfollow"}
+	// 		if !dev {
+	// 			err := users[index].Unfollow() //insta.UnFollow(users[index].ID)
+	// 			if err != nil {
+	// 				// fmt.Println(err.Error())
+	// 				if err.Error() == "fail: feedback_required ()" {
+	// 					resultError = "/unfollow stopped: feedback_required"
+	// 					l.Lock()
+	// 					state["unfollow_current"]--
+	// 					l.Unlock()
+	// 					// telegramResp <- telegramResponse{fmt.Sprintf(), "unfollow"}
+	// 					break
+	// 				} else {
+	// 					fmt.Printf("can't unfollow %s (error: %s)", users[index].Username, err)
+	// 					time.Sleep(61 * time.Second)
+	// 				}
+	// 			} else {
+	// 				setFollowed(db, users[index].Username)
+	// 				incStats(db, "unfollow")
+
+	// 				time.Sleep(61 * time.Second)
+	// 			}
+	// 		} else {
+	// 			time.Sleep(2 * time.Second)
+	// 		}
+	// 	}
+	// }
+
+	// 			stopChan <- true
+	// 		}()
+	// 	case <-stopChan:
+
+	// 		// if resultError != "" {
+	// 		// 	telegramResp <- telegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!\n%s", state["unfollow_current"], resultError), "unfollow"}
+	// 		// } else {
+	// 		// 	if state["unfollow_current"] == 0 {
+	// 		// 		telegramResp <- telegramResponse{fmt.Sprintf("No one was unfollowed"), "unfollow"}
+	// 		// 	} else {
+	// 		// 		telegramResp <- telegramResponse{fmt.Sprintf("\nUnfollowed %d users are not following you back!", state["unfollow_current"]), "unfollow"}
+	// 		// 	}
+	// 		// }
+
+	// 		// l.Lock()
+	// 		// state["unfollow_current"] = 0
+	// 		// state["unfollow_all_count"] = 0
+	// 		// state["unfollow"] = -1
+	// 		// l.Unlock()
+
+	// 		return
+	// 		//default:
+	// 		//	time.Sleep(100 * time.Millisecond)
+	// 	}
+	// }
 }
 
 // login will try to reload a previous session, and will create a new one if it can't

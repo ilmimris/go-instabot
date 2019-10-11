@@ -54,10 +54,11 @@ var (
 	refollowIsStarted     = abool.New()
 	followLikersIsStarted = abool.New()
 
-	cronFollow   int
-	cronUnfollow int
-	cronStats    int
-	cronLike     int
+	cronFollow         int
+	cronUpdateUnfollow int
+	cronUnfollow       int
+	cronStats          int
+	cronLike           int
 
 	l sync.RWMutex
 )
@@ -87,7 +88,7 @@ func main() {
 	telegramResp = make(chan telegramResponse)
 
 	startFollowChan, _, _, stopFollowChan := followManager(db)
-	startUnfollowChan, _, _, stopUnfollowChan := unfollowManager(db)
+	// startUnfollowChan, _, _, stopUnfollowChan := unfollowManager(db)
 	startRefollowChan, _, innerRefollowChan, stopRefollowChan := refollowManager(db)
 	startfollowLikersChan, _, innerfollowLikersChan, stopFollowLikersChan := followLikersManager(db)
 
@@ -137,7 +138,8 @@ func main() {
 	}
 
 	cronFollow, _ = c.AddFunc("0 0 9 * * *", func() { fmt.Println("Start follow"); startFollow(bot, startFollowChan, reportID) })
-	cronUnfollow, _ = c.AddFunc("0 0 22 * * *", func() { fmt.Println("Start unfollow"); startUnfollow(bot, startUnfollowChan, reportID) })
+	cronUpdateUnfollow, _ = c.AddFunc("0 0 1 * * *", func() { fmt.Println("Start updating unfollow list"); updateUnfollowList(db) })
+	cronUnfollow, _ = c.AddFunc("0 0 * * * *", func() { fmt.Println("Start unfollow"); startUnFollowFromQueue(db, 10) })
 	cronStats, _ = c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db, c, -1) })
 	cronLike, _ = c.AddFunc("0 30 10-21 * * *", func() { fmt.Println("Like followers"); likeFollowersPosts(db) })
 
@@ -199,13 +201,13 @@ func main() {
 					}
 				case "follow":
 					startFollow(bot, startFollowChan, int64(update.Message.From.ID))
-				case "unfollow":
-					startUnfollow(bot, startUnfollowChan, int64(update.Message.From.ID))
+				// case "unfollow":
+				// 	startUnfollow(bot, startUnfollowChan, int64(update.Message.From.ID))
 				case "progress":
-					var unfollowProgress = "not started"
-					if state["unfollow"] >= 0 {
-						unfollowProgress = fmt.Sprintf("%d%% [%d/%d]", state["unfollow"], state["unfollow_current"], state["unfollow_all_count"])
-					}
+					// var unfollowProgress = "not started"
+					// if state["unfollow"] >= 0 {
+					// 	unfollowProgress = fmt.Sprintf("%d%% [%d/%d]", state["unfollow"], state["unfollow_current"], state["unfollow_all_count"])
+					// }
 					var followProgress = "not started"
 					if state["follow"] >= 0 {
 						followProgress = fmt.Sprintf("%d%% [%d/%d]", state["follow"], state["follow_current"], state["follow_all_count"])
@@ -218,7 +220,7 @@ func main() {
 					if state["followLikers"] >= 0 {
 						followLikersProgress = fmt.Sprintf("%d%% [%d/%d]", state["followLikers"], state["followLikers_current"], state["followLikers_all_count"])
 					}
-					msg.Text = fmt.Sprintf("Unfollow — %s\nFollow — %s\nRefollow — %s\nfollowLikers - %s", unfollowProgress, followProgress, refollowProgress, followLikersProgress)
+					msg.Text = fmt.Sprintf("Follow — %s\nRefollow — %s\nfollowLikers - %s", followProgress, refollowProgress, followLikersProgress)
 					msgRes, err := bot.Send(msg)
 					if err != nil {
 						l.Lock()
@@ -229,10 +231,10 @@ func main() {
 					if followIsStarted.IsSet() {
 						stopFollowChan <- true
 					}
-				case "cancelunfollow":
-					if unfollowIsStarted.IsSet() {
-						stopUnfollowChan <- true
-					}
+				// case "cancelunfollow":
+				// 	if unfollowIsStarted.IsSet() {
+				// 		stopUnfollowChan <- true
+				// 	}
 				case "cancelrefollow":
 					if refollowIsStarted.IsSet() {
 						stopRefollowChan <- true
