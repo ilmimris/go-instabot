@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
-	"github.com/tevino/abool"
 	"golang.org/x/net/proxy"
 	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )
@@ -49,18 +47,11 @@ var (
 
 	commandKeyboard tgbotapi.ReplyKeyboardMarkup
 
-	followIsStarted       = abool.New()
-	unfollowIsStarted     = abool.New()
-	refollowIsStarted     = abool.New()
-	followLikersIsStarted = abool.New()
-
-	cronFollow         int
+	cronGeneralTask    int
 	cronUpdateUnfollow int
 	cronUnfollow       int
 	cronStats          int
 	cronLike           int
-
-	l sync.RWMutex
 )
 var db *bolt.DB
 
@@ -87,10 +78,19 @@ func main() {
 
 	telegramResp = make(chan telegramResponse)
 
-	startFollowChan, _, _, stopFollowChan := followManager(db)
+	// startFollowChan, _, _, stopFollowChan := followManager(db)
+	startGeneralTaskChan, stopGeneralTaskChan := ControlManager("generalTask", func(name string) error { return startGeneralTask("GeneralTask", db) }, false)
+
+	startUnfollowChan, stopUnfollowChan := ControlManager("unfollow", func(name string) error { return startUnFollowFromQueue("unfollow", db, 10) }, false)
+	startUpdateUnfollowChan, stopUpdateUnfollowChan := ControlManager("updateunfollow", func(name string) error { return updateUnfollowList("updateunfollow", db) }, false)
 	// startUnfollowChan, _, _, stopUnfollowChan := unfollowManager(db)
-	startRefollowChan, _, innerRefollowChan, stopRefollowChan := refollowManager(db)
-	startfollowLikersChan, _, innerfollowLikersChan, stopFollowLikersChan := followLikersManager(db)
+
+	var innerRefollowChan = make(chan string)
+	startRefollowChan, stopRefollowChan := ControlManager("refollow", func(name string) error { return refollow("refollow", db, innerRefollowChan) }, false)
+	// startRefollowChan, _, innerRefollowChan, stopRefollowChan := refollowManager(db)
+
+	var innerfollowLikersChan = make(chan string)
+	startfollowLikersChan, stopFollowLikersChan := ControlManager("followLikers", func(name string) error { return followLikers("followLikers", db, innerfollowLikersChan) }, false)
 
 	var tr http.Transport
 
@@ -137,9 +137,9 @@ func main() {
 		log.Fatalf("[INIT] [Failed to init Telegram updates chan: %v]", err)
 	}
 
-	cronFollow, _ = c.AddFunc("0 0 9 * * *", func() { fmt.Println("Start follow"); startFollow(bot, startFollowChan, reportID) })
-	cronUpdateUnfollow, _ = c.AddFunc("0 0 1 * * *", func() { fmt.Println("Start updating unfollow list"); updateUnfollowList(db) })
-	cronUnfollow, _ = c.AddFunc("0 0 * * * *", func() { fmt.Println("Start unfollow"); startUnFollowFromQueue(db, 10) })
+	cronGeneralTask, _ = c.AddFunc("0 0 9 * * *", func() { fmt.Println("Start GeneralTask"); startGeneralTaskChan <- true })
+	cronUpdateUnfollow, _ = c.AddFunc("0 0 1 * * *", func() { fmt.Println("Start updating unfollow list"); startUpdateUnfollowChan <- true })
+	cronUnfollow, _ = c.AddFunc("0 0 * * * *", func() { fmt.Println("Start unfollow"); startUnfollowChan <- true })
 	cronStats, _ = c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db, c, -1) })
 	cronLike, _ = c.AddFunc("0 30 10-21 * * *", func() { fmt.Println("Like followers"); likeFollowersPosts(db) })
 
@@ -190,21 +190,26 @@ func main() {
 						msg.Text = fmt.Sprintf("/refollow username")
 						bot.Send(msg)
 					} else {
-						startRefollow(bot, startRefollowChan, innerRefollowChan, int64(update.Message.From.ID), args)
+						startRefollowChan <- true
+						innerRefollowChan <- args
 					}
 				case "followlikers":
 					if args == "" {
 						msg.Text = fmt.Sprintf("/followlikers post link")
 						bot.Send(msg)
 					} else {
-						startFollowLikers(bot, startfollowLikersChan, innerfollowLikersChan, int64(update.Message.From.ID), args)
+						startfollowLikersChan <- true
+						innerfollowLikersChan <- args
 					}
 				case "follow":
-					startFollow(bot, startFollowChan, int64(update.Message.From.ID))
+					startGeneralTaskChan <- true
 				case "checkunfollow":
-					updateUnfollowList(db)
-					msg.Text = fmt.Sprintf("updateUnfollowList done")
-					bot.Send(msg)
+					startUpdateUnfollowChan <- true
+				case "cancelcheckunfollow":
+					stopUpdateUnfollowChan <- true
+					// updateUnfollowList(db)
+					// msg.Text = fmt.Sprintf("updateUnfollowList done")
+					// bot.Send(msg)
 				case "progress":
 					// var unfollowProgress = "not started"
 					// if state["unfollow"] >= 0 {
@@ -230,21 +235,13 @@ func main() {
 						l.Unlock()
 					}
 				case "cancelfollow":
-					if followIsStarted.IsSet() {
-						stopFollowChan <- true
-					}
-				// case "cancelunfollow":
-				// 	if unfollowIsStarted.IsSet() {
-				// 		stopUnfollowChan <- true
-				// 	}
+					stopGeneralTaskChan <- true
+				case "cancelunfollow":
+					stopUnfollowChan <- true
 				case "cancelrefollow":
-					if refollowIsStarted.IsSet() {
-						stopRefollowChan <- true
-					}
+					stopRefollowChan <- true
 				case "cancelfollowlikers":
-					if followLikersIsStarted.IsSet() {
-						stopFollowLikersChan <- true
-					}
+					stopFollowLikersChan <- true
 				case "stats":
 					sendStats(bot, db, c, int64(update.Message.From.ID))
 				case "getcomments":

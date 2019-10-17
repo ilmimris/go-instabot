@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/viper"
@@ -23,6 +24,9 @@ import (
 // Whether we are in development mode or not
 var dev bool
 var configFile *string
+
+var l sync.RWMutex
+var isStarted = make(map[string]bool)
 
 // An image will be liked if the poster has more followers than likeLowerLimit, and less than likeUpperLimit
 var likeLowerLimit int
@@ -248,4 +252,44 @@ func contains(slice []goinsta.User, user goinsta.User) bool {
 		}
 	}
 	return false
+}
+
+// ControlManager main func
+func ControlManager(name string, fn func(name string) error, autostart bool) (startChan, stopChan chan bool) {
+	startChan = make(chan bool)
+	stopChan = make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-startChan:
+				l.Lock()
+				if !isStarted[name] {
+					isStarted[name] = true
+					l.Unlock()
+					go func() {
+						fn(name)
+						stopChan <- true
+					}()
+				} else {
+					l.Unlock()
+				}
+			case <-stopChan:
+				l.Lock()
+				if isStarted[name] {
+					isStarted[name] = false
+					l.Unlock()
+				} else {
+					l.Unlock()
+				}
+			}
+
+		}
+	}()
+
+	if autostart {
+		startChan <- true
+	}
+
+	return startChan, stopChan
 }
