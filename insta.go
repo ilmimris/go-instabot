@@ -484,7 +484,7 @@ func login(relogin bool) error {
 			} else {
 				log.Println("Logged in as", insta.Account.Username)
 
-				err, session := insta.Export()
+				session, err := insta.Session()
 				if err == nil {
 					bytes, err := json.Marshal(session)
 					if err == nil {

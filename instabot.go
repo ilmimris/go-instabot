@@ -141,7 +141,7 @@ func main() {
 	cronUpdateUnfollow, _ = c.AddFunc("0 0 1 * * *", func() { fmt.Println("Start updating unfollow list"); startUpdateUnfollowChan <- true })
 	cronUnfollow, _ = c.AddFunc("0 0 * * * *", func() { fmt.Println("Start unfollow"); startUnfollowChan <- true })
 	cronStats, _ = c.AddFunc("0 59 23 * * *", func() { fmt.Println("Send stats"); sendStats(bot, db, c, -1) })
-	cronLike, _ = c.AddFunc("0 30 10-21 * * *", func() { fmt.Println("Like followers"); likeFollowersPosts(db) })
+	// cronLike, _ = c.AddFunc("0 30 10-21 * * *", func() { fmt.Println("Like followers"); likeFollowersPosts(db) })
 
 	for _, task := range c.Entries() {
 		log.Println(task.Next)
@@ -203,6 +203,8 @@ func main() {
 					}
 				case "follow":
 					startGeneralTaskChan <- true
+				case "unfollow":
+					startUnfollowChan <- true
 				case "checkunfollow":
 					startUpdateUnfollowChan <- true
 				case "cancelcheckunfollow":
