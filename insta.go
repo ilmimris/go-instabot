@@ -545,15 +545,18 @@ func startGeneralTask(name string, db *bolt.DB) error {
 		if err != nil {
 			log.Printf("test instagram username (%s) not found", followTestUsername)
 		} else {
-			err := user.Follow()
-			if err != nil {
-				text := fmt.Sprintf("test user not followed, /follow canceled. %v", err)
-				telegramResp <- telegramResponse{text, "follow"}
+			if !dev {
+				err := user.Follow()
+				if err != nil {
+					text := fmt.Sprintf("test user not followed, /follow canceled. %v", err)
+					telegramResp <- telegramResponse{text, "follow"}
 
-				return nil
-			} else {
-				log.Printf("test instagram username (%s) followed and unfollowed", user.Username)
+					return nil
+				}
+
+				user.Unfollow()
 			}
+			log.Printf("test instagram username (%s) followed and unfollowed", user.Username)
 		}
 	}
 

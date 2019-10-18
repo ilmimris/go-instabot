@@ -79,7 +79,7 @@ func main() {
 	telegramResp = make(chan telegramResponse)
 
 	// startFollowChan, _, _, stopFollowChan := followManager(db)
-	startGeneralTaskChan, stopGeneralTaskChan := ControlManager("generalTask", func(name string) error { return startGeneralTask("GeneralTask", db) }, false)
+	startGeneralTaskChan, stopGeneralTaskChan := ControlManager("generalTask", func(name string) error { return startGeneralTask("generalTask", db) }, false)
 
 	startUnfollowChan, stopUnfollowChan := ControlManager("unfollow", func(name string) error { return startUnFollowFromQueue("unfollow", db, 10) }, false)
 	startUpdateUnfollowChan, stopUpdateUnfollowChan := ControlManager("updateunfollow", func(name string) error { return updateUnfollowList("updateunfollow", db) }, false)
