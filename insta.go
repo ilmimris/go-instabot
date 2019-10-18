@@ -306,6 +306,7 @@ func startUnFollowFromQueue(name string, db *bolt.DB, limit int) error {
 		err = user.Unfollow()
 		if err != nil {
 			log.Println(err)
+			return nil
 		} else {
 			incStats(db, "unfollow")
 		}
@@ -735,13 +736,21 @@ func startGeneralTask(name string, db *bolt.DB) error {
 							if like {
 								if userLikesCount, ok := likesToAccountPerSession[posterInfo.Username]; ok {
 									if userLikesCount < maxLikesToAccountPerSession {
-										likeImage(tag, db, item, posterInfo)
-										item.HasLiked = true
+										err := likeImage(tag, db, item, posterInfo)
+										if err != nil {
+											log.Println(err)
+											return err
+										}
+										// item.HasLiked = true
 									} else {
 										log.Println("Likes count per user reached [" + poster.Username + "]")
 									}
 								} else {
-									likeImage(tag, db, item, posterInfo)
+									err := likeImage(tag, db, item, posterInfo)
+									if err != nil {
+										log.Println(err)
+										return err
+									}
 								}
 
 								previoslyFollowed, _ := getFollowed(db, posterInfo.Username)
@@ -754,7 +763,11 @@ func startGeneralTask(name string, db *bolt.DB) error {
 										}
 									}
 									if follow {
-										followUser(tag, db, posterInfo)
+										err := followUser(tag, db, posterInfo)
+										if err != nil {
+											log.Println(err)
+											return err
+										}
 									}
 								}
 							}
@@ -838,23 +851,24 @@ func startGeneralTask(name string, db *bolt.DB) error {
 // }
 
 // Likes an image, if not liked already
-func likeImage(tag string, db *bolt.DB, image goinsta.Item, userInfo goinsta.User) {
+func likeImage(tag string, db *bolt.DB, image goinsta.Item, userInfo goinsta.User) error {
 	log.Println("Liking the picture https://www.instagram.com/p/" + image.Code)
 
 	if !image.HasLiked {
 		if !dev {
-			image.Like()
-			// insta.Like(image.ID)
+			err := image.Like()
+			if err != nil {
+				return err
+			}
 		}
-		// log.Println("Liked")
 		numLiked++
 
 		report[tag]["like"]++
 		incStats(db, "like")
 		likesToAccountPerSession[userInfo.Username]++
-	} else {
-		// log.Println("Image already liked")
 	}
+
+	return nil
 }
 
 // Comments an image
@@ -881,11 +895,7 @@ func commentImage(tag string, db *bolt.DB, image goinsta.Item) {
 }
 
 // Follows a user, if not following already
-func followUser(tag string, db *bolt.DB, user goinsta.User) {
-	// user := userInfo.User
-	// userFriendShip := user.Friendship
-	// check(err)
-	// If not following already
+func followUser(tag string, db *bolt.DB, user goinsta.User) error {
 	if !user.Friendship.Following {
 		if !dev {
 			if user.IsPrivate {
@@ -894,17 +904,13 @@ func followUser(tag string, db *bolt.DB, user goinsta.User) {
 				log.Printf("Following %s\n", user.Username)
 				err := user.Follow()
 				if err != nil {
-					log.Println(err)
+					return err
 				} else {
 					user.Friendship.Following = true
-
-					// if !userFriendShip.Following {
-					// 	log.Println("Not followed")
-					// }
 				}
 			}
 		}
-		// log.Println("Followed")
+
 		if user.Friendship.Following {
 			numFollowed++
 			report[tag]["follow"]++
@@ -914,6 +920,8 @@ func followUser(tag string, db *bolt.DB, user goinsta.User) {
 	} else {
 		log.Println("Already following " + user.Username)
 	}
+
+	return nil
 }
 
 func getJobState(c *cron.Cron, id int) (result string) {
