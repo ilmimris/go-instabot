@@ -191,11 +191,11 @@ func main() {
 				switch command {
 				case "relogin":
 					login()
-					msg.Text = fmt.Sprintf("relogin done")
+					msg.Text = "relogin done"
 					bot.Send(msg)
 				case "refollow":
 					if args == "" {
-						msg.Text = fmt.Sprintf("/refollow username")
+						msg.Text = "/refollow username"
 						bot.Send(msg)
 					} else {
 						startRefollowChan <- true
@@ -203,7 +203,7 @@ func main() {
 					}
 				case "followlikers":
 					if args == "" {
-						msg.Text = fmt.Sprintf("/followlikers post link")
+						msg.Text = "/followlikers post link"
 						bot.Send(msg)
 					} else {
 						startfollowLikersChan <- true

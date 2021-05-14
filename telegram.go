@@ -385,9 +385,8 @@ func removeComments(bot *tgbotapi.BotAPI, comments string, userID int64) {
 func sendTags(bot *tgbotapi.BotAPI, userID int64) {
 	msg := tgbotapi.NewMessage(userID, "")
 	if len(tagsList) > 0 {
-		// keys := GetKeys(tagsList)
-		// msg.Text = strings.Join(keys, ", ")
-		msg.Text = strings.Join(tagsList, ", ")
+		keys := getKeys(tagsList)
+		msg.Text = strings.Join(keys, ", ")
 	} else {
 		msg.Text = "Tags is empty"
 	}
@@ -401,7 +400,8 @@ func addTags(bot *tgbotapi.BotAPI, tag string, userID int64) {
 	tag = strings.Replace(tag, ".", "", -1)
 	if len(tag) > 0 {
 		newTags := strings.Split(tag, ", ")
-		newTags = append(tagsList, newTags...)
+		keys := getKeys(tagsList)
+		newTags = append(keys, newTags...)
 		newTags = sliceUnique(newTags)
 		viper.Set("tags", newTags)
 		viper.WriteConfig()
@@ -418,7 +418,8 @@ func removeTags(bot *tgbotapi.BotAPI, tags string, userID int64) {
 	if len(tags) > 0 {
 		removeTags := strings.Split(tags, ", ")
 		var newTags []string
-		for _, tag := range tagsList {
+		keys := getKeys(tagsList)
+		for _, tag := range keys {
 			if stringInStringSlice(tag, removeTags) {
 
 			} else {
@@ -586,11 +587,7 @@ func getLastLikers() (result []string) {
 
 	latest := make([]goinsta.Item, 0)
 	latestItems := user.Feed()
-	for latestItems.Next() {
-		for _, item := range latestItems.Items {
-			latest = append(latest, item)
-		}
-	}
+	latest = append(latest, latestItems.Items...)
 
 	l := latest
 	if len(l) > 10 {
@@ -630,7 +627,7 @@ func followUser(tag string, db *bolt.DB, user goinsta.User) error {
 
 		if user.Friendship.Following {
 			numFollowed++
-			report[tag]["follow"]++
+			report[line{tag, "follow"}]++
 			incStats(db, "follow")
 			setFollowed(db, user.Username)
 		}
@@ -654,7 +651,7 @@ func likeImage(tag string, db *bolt.DB, image goinsta.Item, userInfo goinsta.Use
 		}
 		numLiked++
 
-		report[tag]["like"]++
+		report[line{tag, "follow"}]++
 		incStats(db, "like")
 		likesToAccountPerSession[userInfo.Username]++
 	}
@@ -665,7 +662,6 @@ func likeImage(tag string, db *bolt.DB, image goinsta.Item, userInfo goinsta.Use
 // Comments an image
 func commentImage(tag string, db *bolt.DB, image goinsta.Item) {
 	// FIXME
-	return
 
 	// // rand.Seed(time.Now().Unix())
 	// text := commentsList[rand.Intn(len(commentsList))]
@@ -700,7 +696,6 @@ func startGeneralTask(name string, db *bolt.DB) error {
 
 	time.Sleep(1 * time.Second)
 
-	report = make(map[string]map[string]int)
 	likesToAccountPerSession = make(map[string]int)
 
 	followTestUsername := viper.GetString("user.instagram.follow_test_username")
@@ -730,7 +725,8 @@ func startGeneralTask(name string, db *bolt.DB) error {
 		var current = 0
 
 		shuffle(tagsList)
-		for _, tag := range tagsList {
+		keys := getKeys(tagsList)
+		for _, tag := range keys {
 			l.RLock()
 			if !isStarted[name] {
 				l.RUnlock()
@@ -738,10 +734,9 @@ func startGeneralTask(name string, db *bolt.DB) error {
 			}
 			l.RUnlock()
 
-			report[tag] = make(map[string]int)
-			report[tag]["like"] = 0
-			report[tag]["follow"] = 0
-			report[tag]["comment"] = 0
+			report[line{tag, "like"}] = 0
+			report[line{tag, "follow"}] = 0
+			report[line{tag, "comment"}] = 0
 
 			current++
 
@@ -766,9 +761,9 @@ func startGeneralTask(name string, db *bolt.DB) error {
 			}
 
 			for tagItem := range report {
-				if tagItem != tag {
-					if report[tagItem]["like"] > 0 || report[tagItem]["follow"] > 0 || report[tagItem]["comment"] > 0 {
-						reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tagItem, report[tagItem]["follow"], report[tagItem]["like"], report[tagItem]["comment"])
+				if tagItem.Tag != tag {
+					if report[line{tagItem.Tag, "like"}] > 0 || report[line{tagItem.Tag, "follow"}] > 0 || report[line{tagItem.Tag, "comment"}] > 0 {
+						reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tagItem, report[line{tagItem.Tag, "follow"}], report[line{tagItem.Tag, "like"}], report[line{tagItem.Tag, "comment"}])
 					} else {
 						reportAsString += fmt.Sprintf("\n#%s: no actions, possibly not enough images", tagItem)
 					}
@@ -946,8 +941,8 @@ func startGeneralTask(name string, db *bolt.DB) error {
 
 					reportAsString = fmt.Sprintf("[%d/%d] %d%%", state["follow_current"], state["follow_all_count"], state["follow"])
 					for tag := range report {
-						if report[tag]["like"] > 0 || report[tag]["follow"] > 0 || report[tag]["comment"] > 0 {
-							reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tag, report[tag]["follow"], report[tag]["like"], report[tag]["comment"])
+						if report[line{tag.Tag, "like"}] > 0 || report[line{tag.Tag, "follow"}] > 0 || report[line{tag.Tag, "comment"}] > 0 {
+							reportAsString += fmt.Sprintf("\n#%s: %d 🐾, %d 👍, %d 💌", tag, report[line{tag.Tag, "follow"}], report[line{tag.Tag, "like"}], report[line{tag.Tag, "comment"}])
 						} else {
 							reportAsString += fmt.Sprintf("\n#%s: ...", tag)
 						}
@@ -1024,7 +1019,7 @@ func startUnFollowFromQueue(name string, db *bolt.DB, limit int) error {
 		if !isStarted[name] {
 			l.RUnlock()
 
-			telegramResp <- telegramResponse{fmt.Sprintf("\nUnfollowed finished: %s", current), "unfollow"}
+			telegramResp <- telegramResponse{fmt.Sprintf("\nUnfollowed finished: %v", current), "unfollow"}
 
 			return nil
 		}
@@ -1199,5 +1194,5 @@ func updateUnfollowList(name string, db *bolt.DB) error {
 }
 
 func likeFollowersPosts(db *bolt.DB) {
-	return
+
 }
