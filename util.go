@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net/smtp"
 	"os"
 	"reflect"
 	"strconv"
@@ -14,77 +15,140 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ahmdrz/goinsta/v2"
 	"github.com/spf13/viper"
-
-	"github.com/ryumaev/goinsta/v3"
 
 	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )
 
-// Whether we are in development mode or not
-var dev bool
-var configFile *string
+var (
+	// Whether we are in development mode or not
+	dev bool
 
-var l sync.RWMutex
-var isStarted = make(map[string]bool)
+	// Whether we want an email to be sent when the script ends / crashes
+	nomail bool
 
-// An image will be liked if the poster has more followers than likeLowerLimit, and less than likeUpperLimit
-var likeLowerLimit int
-var likeUpperLimit int
-var likeCount int
+	// Whether we want to launch the unfollow mode
+	unfollow bool
 
-// A user will be followed if he has more followers than followLowerLimit, and less than followUpperLimit
-// Needs to be a subset of the like interval
-// var followLowerLimit int
-// var followUpperLimit int
-var followCount int
-var potencyRatio float64
+	// Acut
+	run bool
 
-// An image will be commented if the poster has more followers than commentLowerLimit, and less than commentUpperLimit
-// Needs to be a subset of the like interval
-var commentLowerLimit int
-var commentUpperLimit int
-var commentCount int
+	// Whether we want to have logging
+	logs bool
 
-var maxLikesToAccountPerSession int
+	// Used to skip following, liking and commenting same user in this session
+	noduplicate bool
+	// An image will be liked if the poster has more followers than likeLowerLimit, and less than likeUpperLimit
+	likeLowerLimit int
 
-// Hashtags list. Do not put the '#' in the config file
-var tagsList []string
+	likeUpperLimit int
 
-// Limits for the current hashtag
-var limits map[string]int
+	// Needs to be a subset of the like interval
+	followLowerLimit int
+	// A user will be followed if he has more followers than followLowerLimit, and less than followUpperLimit
+	followUpperLimit int
 
-// Comments list
-var commentsList []string
+	// Needs to be a subset of the like interval
+	commentLowerLimit int
+	// An image will be commented if the poster has more followers than commentLowerLimit, and less than commentUpperLimit
+	commentUpperLimit int
+	commentCount      int
 
-// White list. Do not put the '@' in the config file
-var whiteList []string
+	maxLikesToAccountPerSession int
 
-// Report that will be sent at the end of the script
-var report map[string]map[string]int
+	// Hashtags list. Do not put the '#' in the config file
+	tagsList map[string]interface{}
 
-// Counters that will be incremented while we like, comment, and follow
-var numFollowed int
-var numLiked int
-var numCommented int
+	// Limits for the current hashtag
+	limits map[string]int
+
+	// Comments list
+	commentsList []string
+
+	// Report that will be sent at the end of the script
+	report map[line]int
+
+	userBlacklist []string
+	userWhitelist []string
+
+	// Counters that will be incremented while we like, comment, and follow
+	numFollowed  int
+	numLiked     int
+	numCommented int
+
+	// Will hold the tag value
+	tag string
+
+	l sync.RWMutex
+)
+
+type (
+	Report struct {
+		Tag, Action string
+	}
+	// Line is a struct to store one line of the report
+	line struct {
+		Tag, Action string
+	}
+)
+
+func getInput(text string) string {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print(text)
+	input, err := reader.ReadString('\n')
+	check(err)
+	return strings.TrimSpace(input)
+}
+
+// Checks if the user is in the slice
+func containsUser(slice []goinsta.User, user goinsta.User) bool {
+	for _, currentUser := range slice {
+		if currentUser.Username == user.Username {
+			return true
+		}
+	}
+	return false
+}
+
+func getInputf(format string, args ...interface{}) string {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf(format, args...)
+	input, err := reader.ReadString('\n')
+	check(err)
+	return strings.TrimSpace(input)
+}
+
+// Same, with strings
+func containsString(slice []string, user string) bool {
+	for _, currentUser := range slice {
+		if currentUser == user {
+			return true
+		}
+	}
+	return false
+}
 
 // check will log.Fatal if err is an error
 func check(err error) {
 	if err != nil {
-		log.Println("ERROR:", err)
+		log.Fatal("ERROR:", err)
 	}
 }
 
 // Parses the options given to the script
 func parseOptions() {
+	flag.BoolVar(&run, "run", false, "Use this option to follow, like and comment")
+	flag.BoolVar(&unfollow, "sync", false, "Use this option to unfollow those who are not following back")
+	flag.BoolVar(&nomail, "nomail", false, "Use this option to disable the email notifications")
 	flag.BoolVar(&dev, "dev", false, "Use this option to use the script in development mode : nothing will be done for real")
-	configFile = flag.String("config", "config/config.json", "Path to config file")
-	logs := flag.Bool("logs", false, "Use this option to enable the logfile")
+	flag.BoolVar(&logs, "logs", false, "Use this option to enable the logfile")
+	flag.BoolVar(&noduplicate, "noduplicate", false, "Use this option to skip following, liking and commenting same user in this session")
 
 	flag.Parse()
 
 	// -logs enables the log file
-	if *logs {
+	if logs {
 		// Opens a log file
 		t := time.Now()
 		logFile, err := os.OpenFile("instabot-"+t.Format("2006-01-02-15-04-05")+".log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
@@ -99,56 +163,88 @@ func parseOptions() {
 
 // Gets the conf in the config file
 func getConfig() {
-	viper.SetConfigFile(*configFile)
+	folder := "config"
+	if dev {
+		folder = "local"
+	}
+	viper.SetConfigFile(folder + "/config.json")
 
 	// Reads the config file
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error reading config file, %s", err)
 	}
 
+	// Check enviroment
+	viper.SetEnvPrefix("instabot")
+	replacer := strings.NewReplacer(".", "_")
+	viper.SetEnvKeyReplacer(replacer)
+	viper.AutomaticEnv()
+
 	// Confirms which config file is used
 	log.Printf("Using config: %s\n\n", viper.ConfigFileUsed())
 
 	likeLowerLimit = viper.GetInt("limits.like.min")
 	likeUpperLimit = viper.GetInt("limits.like.max")
-	likeCount = viper.GetInt("limits.like.count")
 
-	// followLowerLimit = viper.GetInt("limits.follow.min")
-	// followUpperLimit = viper.GetInt("limits.follow.max")
-	followCount = viper.GetInt("limits.follow.count")
-	potencyRatio = viper.GetFloat64("limits.follow.potency_ratio")
+	followLowerLimit = viper.GetInt("limits.follow.min")
+	followUpperLimit = viper.GetInt("limits.follow.max")
 
 	commentLowerLimit = viper.GetInt("limits.comment.min")
 	commentUpperLimit = viper.GetInt("limits.comment.max")
-	commentCount = viper.GetInt("limits.comment.count")
 
-	viper.SetDefault("limits.max_likes_to_account_per_session", 10)
-	maxLikesToAccountPerSession = viper.GetInt("limits.max_likes_to_account_per_session")
-
-	tagsList = viper.GetStringSlice("tags")
+	tagsList = viper.GetStringMap("tags")
 
 	commentsList = viper.GetStringSlice("comments")
 
-	whiteList = viper.GetStringSlice("whitelist")
-
 	reportID = viper.GetInt64("user.telegram.reportID")
 	admins = viper.GetStringSlice("user.telegram.admins")
-
 	telegramToken = viper.GetString("user.telegram.token")
 	telegramProxy = viper.GetString("user.telegram.proxy")
 	telegramProxyPort = viper.GetInt32("user.telegram.proxy_port")
 	telegramProxyUser = viper.GetString("user.telegram.proxy_user")
 	telegramProxyPassword = viper.GetString("user.telegram.proxy_password")
 
+	userBlacklist = viper.GetStringSlice("blacklist")
+	userWhitelist = viper.GetStringSlice("whitelist")
+
 	instaUsername = viper.GetString("user.instagram.username")
 	instaPassword = viper.GetString("user.instagram.password")
 	instaProxy = viper.GetString("user.instagram.proxy")
 
-	report = make(map[string]map[string]int)
+	report = make(map[line]int)
 }
 
-// Sends an telegram. Check out the "telegram" section of the "config.json" file.
+// Sends an email. Check out the "mail" section of the "config.json" file.
 func send(body string, success bool) {
+	if !nomail {
+		from := viper.GetString("user.mail.from")
+		pass := viper.GetString("user.mail.password")
+		to := viper.GetString("user.mail.to")
+
+		status := func() string {
+			if success {
+				return "Success!"
+			}
+			return "Failure!"
+		}()
+		msg := "From: " + from + "\n" +
+			"To: " + to + "\n" +
+			"Subject:" + status + "  go-instabot\n\n" +
+			body
+
+		err := smtp.SendMail(viper.GetString("user.mail.smtp"),
+			smtp.PlainAuth("", from, pass, viper.GetString("user.mail.server")),
+			from, []string{to}, []byte(msg))
+
+		if err != nil {
+			log.Printf("smtp error: %s", err)
+			return
+		}
+
+		log.Print("sent")
+	}
+
+	// send to telegram
 	bot, err := tgbotapi.NewBotAPI(viper.GetString("user.telegram.token"))
 	if err != nil {
 		log.Println(err)
@@ -178,38 +274,45 @@ func retry(maxAttempts int, sleep time.Duration, function func() error) (err err
 	}
 
 	send(fmt.Sprintf("The script has stopped due to an unrecoverable error :\n%s", err), false)
-	return fmt.Errorf("After %d attempts, last error: %s", maxAttempts, err)
+	return fmt.Errorf("after %d attempts, last error: %s", maxAttempts, err)
 }
 
-func shuffle(slice interface{}) {
-	rv := reflect.ValueOf(slice)
-	swap := reflect.Swapper(slice)
-	length := rv.Len()
-	for i := length - 1; i > 0; i-- {
-		j := rand.Intn(i + 1)
-		swap(i, j)
-	}
-}
-
-func getKeys(slice interface{}) []string {
-	keys := reflect.ValueOf(slice).MapKeys()
-	// log.Println(keys)
-	strkeys := make([]string, len(keys))
-	for i := 0; i < len(keys); i++ {
-		strkeys[i] = keys[i].String()
-	}
-
-	return strkeys
-}
-
-func intInStringSlice(a int, list []string) bool {
-	b := strconv.Itoa(a)
-	for _, c := range list {
-		if b == c {
-			return true
+// Builds the line for the report and prints it
+func buildLine() {
+	reportTag := ""
+	for index, element := range report {
+		if index.Tag == tag {
+			reportTag += fmt.Sprintf("%s %d/%d - ", index.Action, element, limits[index.Action])
 		}
 	}
-	return false
+	// Prints the report line on the screen / in the log file
+	if reportTag != "" {
+		log.Println(strings.TrimSuffix(reportTag, " - "))
+	}
+}
+
+// Builds the report prints it and sends it
+func buildReport() {
+	reportAsString := ""
+	for index, element := range report {
+		var times string
+		if element == 1 {
+			times = "time"
+		} else {
+			times = "times"
+		}
+		if index.Action == "like" {
+			reportAsString += fmt.Sprintf("#%s has been liked %d %s\n", index.Tag, element, times)
+		} else {
+			reportAsString += fmt.Sprintf("#%s has been %sed %d %s\n", index.Tag, index.Action, element, times)
+		}
+	}
+
+	// Displays the report on the screen / log file
+	fmt.Println(reportAsString)
+
+	// Sends the report to the email in the config file, if the option is enabled
+	send(reportAsString, true)
 }
 
 func stringInStringSlice(a string, list []string) bool {
@@ -235,15 +338,6 @@ func sliceUnique(input []string) []string {
 	return u
 }
 
-func getInput(text string) string {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf(text)
-
-	input, err := reader.ReadString('\n')
-	check(err)
-	return strings.TrimSpace(input)
-}
-
 // Checks if the user is in the slice
 func contains(slice []goinsta.User, user goinsta.User) bool {
 	for index := range slice {
@@ -252,6 +346,26 @@ func contains(slice []goinsta.User, user goinsta.User) bool {
 		}
 	}
 	return false
+}
+
+func intInStringSlice(a int, list []string) bool {
+	b := strconv.Itoa(a)
+	for _, c := range list {
+		if b == c {
+			return true
+		}
+	}
+	return false
+}
+
+func shuffle(slice interface{}) {
+	rv := reflect.ValueOf(slice)
+	swap := reflect.Swapper(slice)
+	length := rv.Len()
+	for i := length - 1; i > 0; i-- {
+		j := rand.Intn(i + 1)
+		swap(i, j)
+	}
 }
 
 // ControlManager main func

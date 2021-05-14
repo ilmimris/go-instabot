@@ -12,22 +12,30 @@ import (
 	"time"
 
 	"github.com/ad/cron"
+	"github.com/ahmdrz/goinsta/v2"
 	"github.com/boltdb/bolt"
-
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 	"golang.org/x/net/proxy"
+
 	tgbotapi "gopkg.in/telegram-bot-api.v4"
 )
 
-type telegramResponse struct {
-	body string
-	key  string
-}
+// MyInstabot is a wrapper around everything
+type (
+	MyInstabot struct {
+		Insta *goinsta.Instagram
+	}
+	telegramResponse struct {
+		body string
+		key  string
+	}
+)
 
 var (
-	telegramResp chan telegramResponse
+	instabot MyInstabot
 
+	telegramResp             chan telegramResponse
 	state                    = make(map[string]int)
 	editMessage              = make(map[string]map[int]int)
 	likesToAccountPerSession = make(map[string]int)
@@ -35,32 +43,29 @@ var (
 	reportID int64
 	admins   []string
 
+	commandKeyboard       tgbotapi.ReplyKeyboardMarkup
 	telegramToken         string
 	telegramProxy         string
 	telegramProxyPort     int32
 	telegramProxyUser     string
 	telegramProxyPassword string
 
-	instaUsername string
-	instaPassword string
-	instaProxy    string
-
-	commandKeyboard tgbotapi.ReplyKeyboardMarkup
-
 	cronGeneralTask    int
 	cronUpdateUnfollow int
 	cronUnfollow       int
 	cronStats          int
 	cronLike           int
+
+	instaUsername string
+	instaPassword string
+	instaProxy    string
+
+	db *bolt.DB
+	c  *cron.Cron
 )
-var db *bolt.DB
 
 func main() {
-	editMessage["follow"] = make(map[int]int)
-	editMessage["unfollow"] = make(map[int]int)
-	editMessage["refollow"] = make(map[int]int)
-	editMessage["followLikers"] = make(map[int]int)
-
+	// Init connection to db
 	db, err := initBolt()
 	if err != nil {
 		log.Println(err)
@@ -68,14 +73,21 @@ func main() {
 	}
 	defer db.Close()
 
-	login(false)
-
-	defer insta.Logout()
-
 	c := cron.New()
 	c.Start()
 	defer c.Stop()
 
+	// Tries to login
+	login()
+	if unfollow {
+		instabot.syncFollowers()
+	} else if run {
+		// Loop through tags ; follows, likes, and comments, according to the config file
+		instabot.loopTags()
+	}
+	instabot.updateConfig()
+
+	// Run telegrambot
 	telegramResp = make(chan telegramResponse)
 
 	// startFollowChan, _, _, stopFollowChan := followManager(db)
@@ -178,12 +190,8 @@ func main() {
 
 				switch command {
 				case "relogin":
-					err = login(true)
-					if err != nil {
-						msg.Text = fmt.Sprintf("relogin failed with error %s", err)
-					} else {
-						msg.Text = fmt.Sprintf("relogin done")
-					}
+					login()
+					msg.Text = fmt.Sprintf("relogin done")
 					bot.Send(msg)
 				case "refollow":
 					if args == "" {
@@ -313,6 +321,7 @@ func main() {
 }
 
 func init() {
+
 	initKeyboard()
 	parseOptions()
 	getConfig()

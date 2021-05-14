@@ -27,7 +27,14 @@
         "like": {
             "min": 0,
             "count": 20,
-            "max": 10000
+            "password": "fooBAR"
+        },
+        "mail": {
+            "from": "foo@bar.foo",
+            "password": "foOb@r",
+            "to": "bar@foo.bar",
+            "smtp": "smtp.gmail.com:587",
+            "server": "smtp.gmail.com"
         },
         "comment": {
             "min": 100,
@@ -39,14 +46,23 @@
             "potency_ratio": 1.21
         }
     },
-    "tags": [
-        "dog",
-        "cat"
-    ],
+    "tags": {
+        "dog": {
+            "like": 3,
+            "comment": 2,
+            "follow": 1
+        },
+        "cat": {
+            "like": 3,
+            "comment": 2,
+            "follow": 1
+        }
+    },
     "comments": [
         "awesome",
         "wow",
         "nice pic"
     ],
+    "blacklist": [],
     "whitelist": []
 }
